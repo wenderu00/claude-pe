@@ -254,41 +254,108 @@ export const TOKENS: { light: Record<string, string>; dark: Record<string, strin
   }
 }
 
-// primereact modules that @uigovpe/components wraps: import the @uigovpe component instead.
-export const WRAPPED_PRIMEREACT: readonly string[] = [
-  "primereact/accordion",
-  "primereact/autocomplete",
-  "primereact/badge",
-  "primereact/breadcrumb",
-  "primereact/button",
-  "primereact/calendar",
-  "primereact/card",
-  "primereact/checkbox",
-  "primereact/chip",
-  "primereact/chips",
-  "primereact/column",
-  "primereact/datatable",
-  "primereact/dialog",
-  "primereact/divider",
-  "primereact/dropdown",
-  "primereact/galleria",
-  "primereact/image",
-  "primereact/inputmask",
-  "primereact/inputnumber",
-  "primereact/inputswitch",
-  "primereact/inputtext",
-  "primereact/inputtextarea",
-  "primereact/menu",
-  "primereact/message",
-  "primereact/multiselect",
-  "primereact/overlaypanel",
-  "primereact/paginator",
-  "primereact/password",
-  "primereact/radiobutton",
-  "primereact/tabview",
-  "primereact/tag",
-  "primereact/tooltip"
-]
+// primereact modules that @uigovpe/components wraps, and the components to import instead.
+export const WRAPPED_PRIMEREACT: Readonly<Record<string, readonly string[]>> = {
+  "primereact/accordion": [
+    "Accordion"
+  ],
+  "primereact/autocomplete": [
+    "Search"
+  ],
+  "primereact/badge": [
+    "Badge"
+  ],
+  "primereact/breadcrumb": [
+    "BreadCrumb"
+  ],
+  "primereact/button": [
+    "Button"
+  ],
+  "primereact/calendar": [
+    "DatePicker"
+  ],
+  "primereact/card": [
+    "Card"
+  ],
+  "primereact/checkbox": [
+    "Checkbox"
+  ],
+  "primereact/chip": [
+    "Chip"
+  ],
+  "primereact/chips": [
+    "Chips"
+  ],
+  "primereact/column": [
+    "Column"
+  ],
+  "primereact/datatable": [
+    "Table"
+  ],
+  "primereact/dialog": [
+    "Dialog"
+  ],
+  "primereact/divider": [
+    "Divider"
+  ],
+  "primereact/dropdown": [
+    "Dropdown"
+  ],
+  "primereact/galleria": [
+    "Galleria"
+  ],
+  "primereact/image": [
+    "Image"
+  ],
+  "primereact/inputmask": [
+    "InputMask"
+  ],
+  "primereact/inputnumber": [
+    "InputNumber"
+  ],
+  "primereact/inputswitch": [
+    "InputSwitch"
+  ],
+  "primereact/inputtext": [
+    "InputCurrency",
+    "InputMasked",
+    "InputSearch",
+    "InputText"
+  ],
+  "primereact/inputtextarea": [
+    "InputTextarea"
+  ],
+  "primereact/menu": [
+    "Menu"
+  ],
+  "primereact/message": [
+    "Message"
+  ],
+  "primereact/multiselect": [
+    "MultiSelect"
+  ],
+  "primereact/overlaypanel": [
+    "OverlayPanel"
+  ],
+  "primereact/paginator": [
+    "Paginator"
+  ],
+  "primereact/password": [
+    "InputPassword"
+  ],
+  "primereact/radiobutton": [
+    "RadioButton"
+  ],
+  "primereact/tabview": [
+    "TabView"
+  ],
+  "primereact/tag": [
+    "Tag"
+  ],
+  "primereact/tooltip": [
+    "Tooltip"
+  ]
+}
 
 export const COMPONENTS: readonly { name: string; docsUrl: string | null; obsolete: boolean }[] = [
   {

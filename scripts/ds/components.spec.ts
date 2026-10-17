@@ -1,7 +1,7 @@
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
 
-import { describeComponents } from './components.ts'
+import { describeComponents, wrappers } from './components.ts'
 import type { ComponentDoc } from './components.ts'
 
 const FILES: Record<string, string> = {
@@ -218,4 +218,13 @@ test('bundler aliases of React read as React', () => {
     '/x/index.d.ts',
   )[0]!.props[0]!
   assert.equal(icon.type, 'React.ReactNode')
+})
+
+test('wrappers: each primereact module names the @uigovpe components built on it', () => {
+  assert.deepEqual(wrappers(docs), {
+    'primereact/button': ['Button'],
+    'primereact/card': ['Card'],
+    'primereact/datatable': ['Table'],
+    'primereact/inputtext': ['InputCurrency', 'InputText'],
+  })
 })

@@ -31,33 +31,26 @@ Se o `package.json` do projeto tem uma versão maior, confira a prop no Storyboo
 npm install @uigovpe/components @uigovpe/styles
 ```
 
-`UiProvider` usa hooks do React, então fica num arquivo cliente:
-
-```tsx
-// app/providers.tsx
-'use client'
-import { UiProvider } from '@uigovpe/components'
-
-export function Providers({ children }: { children: React.ReactNode }) {
-  return <UiProvider>{children}</UiProvider>
-}
-```
+Os arquivos publicados do `@uigovpe/components` já começam com `'use client'`. Então o
+layout e as páginas do servidor importam os componentes direto, sem arquivo cliente próprio:
 
 ```tsx
 // app/layout.tsx
+import { UiProvider } from '@uigovpe/components'
 import '@uigovpe/styles'
-import { Providers } from './providers'
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
     <html lang="pt-BR">
       <body>
-        <Providers>{children}</Providers>
+        <UiProvider>{children}</UiProvider>
       </body>
     </html>
   )
 }
 ```
+
+`/pe-scaffold <pasta>` cria um projeto Next.js novo já assim, com a `GovBar` na página inicial.
 
 ## Como achar um componente
 

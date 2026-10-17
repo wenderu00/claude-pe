@@ -3,19 +3,21 @@ import type { Register } from 'claude-code'
 import { browserSessionStart, browserUiMessage, register as browser } from './browser/register'
 import { filetreeSessionStart, filetreeToolCall, filetreeUiMessage, register as filetree } from './filetree/register'
 import { guard } from './parts'
+import { peSessionStart, register as pe } from './pe/register'
 import type { AbovePromptEvent, PartEvent } from './parts'
 import { progressAbovePrompt, progressSessionStart, progressTurnComplete, register as progress } from './progress/register'
 import { register as skins, skinsAbovePrompt, skinsSessionStart, skinsToolCall, skinsTurnComplete } from './skins'
 
 const reason = (error: unknown): string => (error instanceof Error ? error.message : String(error))
 
-// One plugin, four parts. An event that more than one part hooks is hooked here once, with
+// One plugin, five parts. An event that more than one part hooks is hooked here once, with
 // the parts' hooks called one inside the next, outermost first (see parts.ts).
 export const register: Register = (on, options) => {
   progress(on, options)
   skins(on)
   filetree(on, options)
   browser(on, options)
+  pe(on)
 
   // Adds `$.skins` and `$.browser` for other mods. Each method is a floor: a call is the
   // skins.markdown, browser.open or browser.close event, which the parts' hooks answer.
@@ -35,12 +37,20 @@ export const register: Register = (on, options) => {
     type E = PartEvent<'session.start'>
     const skipped = (part: string, error: unknown) => $.ui.log(`pe-devkit: ${part} session.start skipped: ${reason(error)}`)
     const toEngine = guard((x: E) => next(x))
+    const toPe = guard(async (x: E) => {
+      try {
+        return await peSessionStart($, x, toEngine.next)
+      } catch (error) {
+        skipped('pe', error)
+        return toEngine.recover(x)
+      }
+    })
     const toBrowser = guard(async (x: E) => {
       try {
-        return await browserSessionStart($, x, toEngine.next)
+        return await browserSessionStart($, x, toPe.next)
       } catch (error) {
         skipped('browser', error)
-        return toEngine.recover(x)
+        return toPe.recover(x)
       }
     })
     const toFiletree = guard(async (x: E) => {

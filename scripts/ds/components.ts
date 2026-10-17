@@ -191,3 +191,15 @@ export function describeComponents(files: Record<string, string>, entry: string)
     .filter((d): d is ComponentDoc => d !== undefined)
     .sort((a, b) => a.name.localeCompare(b.name))
 }
+
+// For each primereact module a component extends: the @uigovpe components to use instead.
+export function wrappers(docs: ComponentDoc[]): Record<string, string[]> {
+  const out: Record<string, string[]> = {}
+  for (const doc of docs) {
+    for (const base of doc.bases) {
+      if (!base.module.startsWith('primereact/')) continue
+      out[base.module] = [...new Set([...(out[base.module] ?? []), doc.name])].sort()
+    }
+  }
+  return Object.fromEntries(Object.entries(out).sort(([a], [b]) => a.localeCompare(b)))
+}

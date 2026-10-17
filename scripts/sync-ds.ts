@@ -4,7 +4,7 @@ import { execSync } from 'node:child_process'
 import { mkdirSync, readdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
 
-import { describeComponents } from './ds/components.ts'
+import { describeComponents, wrappers } from './ds/components.ts'
 import { renderComponent, renderIndex, renderTokens, storiesFor, STORYBOOK } from './ds/reference.ts'
 import type { StorybookIndex, Versions } from './ds/reference.ts'
 import { extractTokens } from './ds/tokens.ts'
@@ -53,7 +53,7 @@ async function main(): Promise<void> {
   writeFileSync(join(pages, 'index.md'), renderIndex(docs, versions))
   writeFileSync(join(REFS, 'tokens.md'), renderTokens(tokens, versions))
 
-  const wrapped = [...new Set(docs.flatMap(d => d.bases.map(b => b.module)).filter(m => m.startsWith('primereact/')))].sort()
+  const wrapped = wrappers(docs)
   const catalog = docs.map(d => {
     const s = storiesFor(index, d.name)
     return { name: d.name, docsUrl: s?.docsUrl ?? null, obsolete: s?.obsolete ?? false }
@@ -68,15 +68,15 @@ async function main(): Promise<void> {
       '',
       `export const TOKENS: { light: Record<string, string>; dark: Record<string, string> } = ${JSON.stringify(tokens, null, 2)}`,
       '',
-      '// primereact modules that @uigovpe/components wraps: import the @uigovpe component instead.',
-      `export const WRAPPED_PRIMEREACT: readonly string[] = ${JSON.stringify(wrapped, null, 2)}`,
+      '// primereact modules that @uigovpe/components wraps, and the components to import instead.',
+      `export const WRAPPED_PRIMEREACT: Readonly<Record<string, readonly string[]>> = ${JSON.stringify(wrapped, null, 2)}`,
       '',
       `export const COMPONENTS: readonly { name: string; docsUrl: string | null; obsolete: boolean }[] = ${JSON.stringify(catalog, null, 2)}`,
       '',
     ].join('\n'),
   )
   rmSync(WORK, { recursive: true, force: true })
-  console.log(`sync-ds: ${docs.length} componentes, ${Object.keys(tokens.light).length} tokens, ${wrapped.length} módulos primereact`)
+  console.log(`sync-ds: ${docs.length} componentes, ${Object.keys(tokens.light).length} tokens, ${Object.keys(wrapped).length} módulos primereact`)
 }
 
 await main()
