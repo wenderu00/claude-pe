@@ -103,15 +103,39 @@ const EXTS: Record<string, number> = {
   txt: 0xf09aa,
 }
 
+export type Category = 'code' | 'config' | 'docs' | 'other'
+
+// Extensions in EXTS that are not code; the rest of EXTS is code.
+const CONFIG_EXTS = new Set(['json', 'jsonc', 'yaml', 'yml', 'toml', 'ini', 'conf', 'xml', 'lock'])
+const DOCS_EXTS = new Set(['md', 'markdown', 'txt', 'pdf', 'csv'])
+const MEDIA_EXTS = new Set(['svg', 'jpg', 'jpeg', 'png', 'gif', 'webp', 'mp4', 'mkv', 'mov', 'mp3', 'wav', 'flac', 'zip', 'gz', 'xz', 'tar'])
+
+// A file named `constructor` is not the object's own constructor.
+const own = (table: Record<string, number>, key: string): number | undefined => (Object.hasOwn(table, key) ? table[key] : undefined)
+
+// The named files in NAMES are project config, except the docs among them. A dotfile
+// or a Dockerfile variant with no known extension is config too.
+export function fileCategory(name: string): Category {
+  const lower = name.toLowerCase()
+  if (own(NAMES, lower)) return lower === 'license' || lower.endsWith('.md') ? 'docs' : 'config'
+  if (lower.startsWith('dockerfile')) return 'config'
+  const dot = lower.lastIndexOf('.')
+  const ext = dot > 0 ? lower.slice(dot + 1) : ''
+  if (CONFIG_EXTS.has(ext)) return 'config'
+  if (DOCS_EXTS.has(ext)) return 'docs'
+  if (MEDIA_EXTS.has(ext) || !own(EXTS, ext)) return lower.startsWith('.') ? 'config' : 'other'
+  return 'code'
+}
+
 export function fileIcon(n: FileNode, open: boolean, isRepo: boolean): string {
   if (n.kind === 'link') return cp(0xf481)
   if (n.kind === 'dir') return cp(isRepo ? 0xf02a2 : open ? 0xe5fe : 0xe5ff)
   const lower = n.name.toLowerCase()
-  const named = NAMES[lower]
+  const named = own(NAMES, lower)
   if (named) return cp(named)
   const dot = lower.lastIndexOf('.')
   const ext = dot >= 0 ? lower.slice(dot + 1) : ''
-  return cp(EXTS[ext] ?? 0xf0214)
+  return cp(own(EXTS, ext) ?? 0xf0214)
 }
 
 export const GIT_COLOR: Record<string, string> = {
