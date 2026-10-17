@@ -19,6 +19,7 @@ test('/pe-component names the import and the Storybook page, and gives the link 
   expect(text).toContain("import { Button } from '@uigovpe/components'")
   expect(text).toContain('https://ligadigital.pe.gov.br/storybook/index.html?path=/docs/componentes-button--docs')
   expect(text).toContain('references/components/Button.md')
+  expect(text).toContain('não abriu')
 })
 
 test('/pe-component says when a component is obsolete', async $ => {
@@ -80,4 +81,14 @@ test('/pe-scaffold stops at a failed step and shows its error', async ($, on) =>
   expect(text).toContain('npm ERR! network')
   expect(ran).toHaveLength(1)
   expect(written).toEqual({})
+})
+
+test('/pe-scaffold says where it stopped when a step cannot start', async ($, on) => {
+  on('session.cwd', () => ({ value: '/work' }) as never)
+  on('fs.exists', () => ({ value: false }) as never)
+  // A deny makes $.process.run reject with its text, as a command that cannot start does.
+  on('process.run', () => ({ deny: 'spawn npx ENOENT' }) as never)
+  const { text } = await run($, 'pe-scaffold', 'portal')
+  expect(text).toContain('create-next-app')
+  expect(text).toContain('spawn npx ENOENT')
 })

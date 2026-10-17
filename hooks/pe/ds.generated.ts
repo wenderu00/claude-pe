@@ -307,9 +307,6 @@ export const WRAPPED_PRIMEREACT: Readonly<Record<string, readonly string[]>> = {
   "primereact/image": [
     "Image"
   ],
-  "primereact/inputmask": [
-    "InputMask"
-  ],
   "primereact/inputnumber": [
     "InputNumber"
   ],

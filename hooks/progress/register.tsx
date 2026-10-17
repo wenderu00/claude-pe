@@ -758,7 +758,9 @@ export const register = (on: On, options: PluginOptions): void => {
   on('tool.call', { tool: TASK_TOOLS }, async ($, e, next) => {
     const result = await next(e)
     if (e.agentId !== undefined || result.deny !== undefined || result.isError) return result
-    const list = await update($, tasks, prev => applyTaskCall(prev, { tool: e.tool, input: e, result: result.result }))
+    await update($, tasks, prev => applyTaskCall(prev, { tool: e.tool, input: e, result: result.result }))
+    // Read back, not the list this call made: a call that ran beside it may have updated it since.
+    const list = await read($, tasks)
     await update($, flow, () => flowOf(list))
     return result
   })

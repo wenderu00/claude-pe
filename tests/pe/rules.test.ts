@@ -82,3 +82,18 @@ test('rules: the advice names the file, each issue, and the version when newer',
   expect(text).toContain(`^1.2.0`)
   expect(text).toContain(DS_VERSIONS.components)
 })
+
+test('rules: a selector with a colon is not a declaration, and url() fragments are not colors', () => {
+  expect(issuesIn('src/a.css', 'a:hover #fade { color: var(--color-text-link) }')).toEqual([])
+  expect(issuesIn('src/a.css', '.i { background: url(i.svg#add); fill: url(#fade) }')).toEqual([])
+})
+
+test('rules: every hex in one declaration is reported', () => {
+  const hexes = issuesIn('src/a.css', '.g { background: linear-gradient(#123456, #654321); }').map(i => (i.kind === 'hex' ? i.hex : ''))
+  expect(hexes).toEqual(['#123456', '#654321'])
+})
+
+test('rules: an upper bound is not a newer version', () => {
+  expect(isNewer('<2.0.0', '1.1.40')).toBe(false)
+  expect(isNewer('>=1.0.0 <2.0.0', '1.1.40')).toBe(false)
+})

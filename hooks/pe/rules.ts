@@ -14,8 +14,12 @@ const NOT_CHECKED = /\.(test|spec|stories)\.[a-z]+$/i
 
 const IMPORT = /import\s+([^'";]*?)\s+from\s+['"](primereact\/[\w-]+)['"]/g
 const HEX = '#(?:[0-9a-f]{8}|[0-9a-f]{6}|[0-9a-f]{3,4})\\b'
-// A CSS declaration's value: after its colon, before the end of the declaration.
-const CSS_HEX = new RegExp(`:[^;{}]*?(${HEX})`, 'gi')
+// A CSS declaration: a name, its colon and a value that ends the declaration with ; or }.
+// A selector such as `a:hover #x {` ends with { and is not one.
+const CSS_DECL = /[-\w$]+\s*:\s*([^;{}]*)(?=[;}])/g
+const HEX_IN = new RegExp(HEX, 'gi')
+// url(#id) and url(file#id) name a fragment, not a color.
+const URL = /url\([^)]*\)/gi
 // A color-like prop or style key with a quoted hex: `color: '#fff'`, `fill="#fff"`.
 const KEY_HEX = new RegExp(`\\b(?:color|background(?:Color)?|border(?:Top|Right|Bottom|Left)?(?:Color)?|fill|stroke|outline(?:Color)?|boxShadow|textShadow)\\s*[:=]\\s*\\{?\\s*(['"\`])(${HEX})\\1`, 'gi')
 
@@ -68,7 +72,11 @@ export function issuesIn(path: string, text: string): Issue[] {
       if (components && bringsValues(m[1]!)) add(module, { kind: 'primereact', module, components })
     }
   }
-  const hexes = STYLE.test(path) ? [...text.matchAll(CSS_HEX)].map(m => m[1]!) : MARKUP.test(path) ? [...text.matchAll(KEY_HEX)].map(m => m[2]!) : []
+  const hexes = STYLE.test(path)
+    ? [...text.matchAll(CSS_DECL)].flatMap(m => [...m[1]!.replace(URL, '').matchAll(HEX_IN)].map(h => h[0]))
+    : MARKUP.test(path)
+      ? [...text.matchAll(KEY_HEX)].map(m => m[2]!)
+      : []
   for (const hex of hexes) add(hex.toLowerCase(), { kind: 'hex', hex, tokens: tokensFor(hex) })
   return out
 }
@@ -89,8 +97,10 @@ const versionOf = (v: string): number[] | null => {
   return m ? [Number(m[1]), Number(m[2]), Number(m[3])] : null
 }
 
-// Whether the lowest version `range` allows is past `documented`.
+// Whether the lowest version `range` allows is past `documented`. A range with an upper
+// bound or alternatives has no lowest version this can read: never newer.
 export function isNewer(range: string, documented: string): boolean {
+  if (/[<|]/.test(range)) return false
   const a = versionOf(range)
   const b = versionOf(documented)
   if (!a || !b) return false

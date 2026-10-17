@@ -28,3 +28,13 @@ test('guard: a part that failed after next keeps its last next result, the part 
   expect(await g.recover(3)).toBe(20)
   expect(runs).toBe(2)
 })
+
+test('guard: tells a failure from beneath apart from the part’s own', async () => {
+  const boom = new Error('engine')
+  const g = guard(async () => {
+    throw boom
+  })
+  await g.next(1).catch(() => undefined)
+  expect(g.isFrom(boom)).toBe(true)
+  expect(g.isFrom(new Error('part'))).toBe(false)
+})

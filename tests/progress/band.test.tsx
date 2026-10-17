@@ -82,3 +82,9 @@ test('desktop: the bar is one Svg with the count in its text', async ($, on) => 
   expect(String(svg?.props.alt)).toContain('Tarefas 0/1')
   await ui.unmount()
 })
+
+test('two task calls at once both count', async ($, on) => {
+  taskEngine(on)
+  await Promise.all([create($, 'Uma'), create($, 'Duas')])
+  expect((await terminalBand($)).label).toEqual(['Tarefas 0/2'])
+})

@@ -36,11 +36,11 @@ test('tasks: a deleted task leaves the count', () => {
   expect(flowOf(list)).toMatchObject({ total: 1 })
 })
 
-test('tasks: a task created after a finished list starts a new list', () => {
+test('tasks: a task created after a finished list joins it, as Claude keeps it', () => {
   let list = create([], '1', 'Uma')
   list = status(list, '1', 'completed')
   list = create(list, '2', 'Nova')
-  expect(flowOf(list)).toMatchObject({ total: 1, done: 0, isFinished: false })
+  expect(flowOf(list)).toMatchObject({ total: 2, done: 1, isFinished: false })
 })
 
 test('tasks: TodoWrite replaces the list', () => {

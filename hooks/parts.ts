@@ -16,11 +16,22 @@ export type PartResult<N extends EventName> = Promise<Awaited<ReturnType<Hook<N>
 
 // The engine's rule for a plugin's hook that fails, kept for each part: the part is passed
 // over, and its last `next` result stands, or the part beneath runs in its place.
-export function guard<E, R>(beneath: (e: E) => Promise<R>): { next: (e: E) => Promise<R>; recover: (e: E) => Promise<R> } {
+// `isFrom` tells a failure that came up from beneath, which is not the part's to answer for.
+export function guard<E, R>(beneath: (e: E) => Promise<R>): {
+  next: (e: E) => Promise<R>
+  recover: (e: E) => Promise<R>
+  isFrom: (error: unknown) => boolean
+} {
   let last: Promise<R> | undefined
+  const failures = new Set<unknown>()
   return {
-    next: e => (last = beneath(e)),
+    next: e => {
+      last = beneath(e)
+      last.catch(error => failures.add(error))
+      return last
+    },
     recover: e => last ?? beneath(e),
+    isFrom: error => failures.has(error),
   }
 }
 

@@ -9,7 +9,7 @@ import { CREATE_NEXT_APP, installArgs, isValidName, scaffoldFiles } from './scaf
 const EDITS = /^(Edit|Write)$/
 const MAX_DEPTH = 16
 
-// Shown once per load: the project asks for a newer @uigovpe than the skill documents.
+// Shown once per session: the project asks for a newer @uigovpe than the skill documents.
 let versionNoted = false
 
 const posix = (p: string): string => p.replace(/\\/g, '/')
@@ -38,6 +38,7 @@ const tail = (text: string): string => text.trim().split('\n').slice(-12).join('
 
 export async function peSessionStart($: EngineInterface, e: PartEvent<'session.start'>, next: PartNext<'session.start'>): PartResult<'session.start'> {
   const started = await next(e)
+  versionNoted = false
   await $.command.register({
     name: 'pe-component',
     description: 'Componente da Liga Digital: import, props e a história no Storybook; sem nome, lista todos',
@@ -59,13 +60,18 @@ async function scaffold($: EngineInterface, name: string): Promise<string> {
   const target = `${cwd}/${name}`
   if (await $.fs.exists(target)) return `A pasta ${target} já existe. Escolha outro nome.`
 
-  const created = await $.process.run(CREATE_NEXT_APP(name), { cwd, timeoutMs: 300_000 })
+  // A step that cannot start or runs past its time rejects; its text says the same as a failed one.
+  const created = await $.process.run(CREATE_NEXT_APP(name), { cwd, timeoutMs: 300_000 }).catch((error: unknown) => ({ exitCode: -1, stdout: '', stderr: reason(error) }))
   if (created.exitCode !== 0) return `create-next-app falhou (código ${created.exitCode}):\n${tail(created.stderr || created.stdout)}`
-  const installed = await $.process.run(installArgs(), { cwd: target, timeoutMs: 600_000 })
+  const installed = await $.process.run(installArgs(), { cwd: target, timeoutMs: 600_000 }).catch((error: unknown) => ({ exitCode: -1, stdout: '', stderr: reason(error) }))
   if (installed.exitCode !== 0) {
-    return `O projeto foi criado em ${target}, mas npm install falhou (código ${installed.exitCode}):\n${tail(installed.stderr || installed.stdout)}`
+    return `O projeto foi criado em ${target}, mas npm install falhou (código ${installed.exitCode}):\n${tail(installed.stderr || installed.stdout)}\nApague a pasta ou rode o npm install nela.`
   }
-  for (const [rel, text] of Object.entries(scaffoldFiles(name))) await $.fs.write(`${target}/${rel}`, text)
+  try {
+    for (const [rel, text] of Object.entries(scaffoldFiles(name))) await $.fs.write(`${target}/${rel}`, text)
+  } catch (error) {
+    return `O projeto foi criado e instalado em ${target}, mas não foi possível escrever os arquivos da Liga Digital: ${reason(error)}`
+  }
   return [
     `Projeto criado em ${target}, com @uigovpe/components ${DS_VERSIONS.components} e @uigovpe/styles ${DS_VERSIONS.styles}.`,
     'app/layout.tsx carrega os estilos e o UiProvider; app/page.tsx começa com a GovBar.',

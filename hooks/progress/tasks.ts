@@ -18,9 +18,7 @@ function created(list: TaskItem[], input: unknown, result: unknown): TaskItem[] 
   if (!id) return list
   const subject = text(task?.subject) || (isRecord(input) ? text(input.subject) : '')
   const item: TaskItem = { id, subject, active: isRecord(input) ? text(input.activeForm) : '', status: 'pending' }
-  // A list whose every task is done is a finished flow: the next task starts another.
-  const kept = list.length > 0 && list.every(t => t.status === 'completed') ? [] : list
-  return [...kept.filter(t => t.id !== id), item].slice(-MAX_TASKS)
+  return [...list.filter(t => t.id !== id), item].slice(-MAX_TASKS)
 }
 
 function updated(list: TaskItem[], input: unknown): TaskItem[] {

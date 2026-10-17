@@ -53,7 +53,8 @@ async function main(): Promise<void> {
   writeFileSync(join(pages, 'index.md'), renderIndex(docs, versions))
   writeFileSync(join(REFS, 'tokens.md'), renderTokens(tokens, versions))
 
-  const wrapped = wrappers(docs)
+  // An obsolete component is never the one to use instead.
+  const wrapped = wrappers(docs.filter(d => !storiesFor(index, d.name)?.obsolete))
   const catalog = docs.map(d => {
     const s = storiesFor(index, d.name)
     return { name: d.name, docsUrl: s?.docsUrl ?? null, obsolete: s?.obsolete ?? false }

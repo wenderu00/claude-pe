@@ -41,6 +41,7 @@ export const register: Register = (on, options) => {
       try {
         return await peSessionStart($, x, toEngine.next)
       } catch (error) {
+        if (toEngine.isFrom(error)) throw error
         skipped('pe', error)
         return toEngine.recover(x)
       }
@@ -49,6 +50,7 @@ export const register: Register = (on, options) => {
       try {
         return await browserSessionStart($, x, toPe.next)
       } catch (error) {
+        if (toPe.isFrom(error)) throw error
         skipped('browser', error)
         return toPe.recover(x)
       }
@@ -57,6 +59,7 @@ export const register: Register = (on, options) => {
       try {
         return await filetreeSessionStart($, x, toBrowser.next)
       } catch (error) {
+        if (toBrowser.isFrom(error)) throw error
         skipped('filetree', error)
         return toBrowser.recover(x)
       }
@@ -65,6 +68,7 @@ export const register: Register = (on, options) => {
       try {
         return await skinsSessionStart($, x, toFiletree.next)
       } catch (error) {
+        if (toFiletree.isFrom(error)) throw error
         skipped('skins', error)
         return toFiletree.recover(x)
       }
@@ -72,6 +76,7 @@ export const register: Register = (on, options) => {
     try {
       return await progressSessionStart($, e, toSkins.next)
     } catch (error) {
+      if (toSkins.isFrom(error)) throw error
       skipped('progress', error)
       return toSkins.recover(e)
     }
@@ -85,6 +90,7 @@ export const register: Register = (on, options) => {
       try {
         return await filetreeToolCall($, x, toEngine.next)
       } catch (error) {
+        if (toEngine.isFrom(error)) throw error
         skipped('filetree', error)
         return toEngine.recover(x)
       }
@@ -92,6 +98,7 @@ export const register: Register = (on, options) => {
     try {
       return await skinsToolCall($, e, toFiletree.next)
     } catch (error) {
+      if (toFiletree.isFrom(error)) throw error
       skipped('skins', error)
       return toFiletree.recover(e)
     }
@@ -105,6 +112,7 @@ export const register: Register = (on, options) => {
       try {
         return await skinsTurnComplete($, x, toEngine.next)
       } catch (error) {
+        if (toEngine.isFrom(error)) throw error
         skipped('skins', error)
         return toEngine.recover(x)
       }
@@ -112,6 +120,7 @@ export const register: Register = (on, options) => {
     try {
       return await progressTurnComplete($, e, toSkins.next)
     } catch (error) {
+      if (toSkins.isFrom(error)) throw error
       skipped('progress', error)
       return toSkins.recover(e)
     }
@@ -125,6 +134,7 @@ export const register: Register = (on, options) => {
       try {
         return await browserUiMessage($, x, toEngine.next)
       } catch (error) {
+        if (toEngine.isFrom(error)) throw error
         skipped('browser', error)
         return toEngine.recover(x)
       }
@@ -132,6 +142,7 @@ export const register: Register = (on, options) => {
     try {
       return await filetreeUiMessage($, e, toBrowser.next)
     } catch (error) {
+      if (toBrowser.isFrom(error)) throw error
       skipped('filetree', error)
       return toBrowser.recover(e)
     }
@@ -144,6 +155,7 @@ export const register: Register = (on, options) => {
       try {
         return await skinsAbovePrompt($, x, toEngine.next)
       } catch (error) {
+        if (toEngine.isFrom(error)) throw error
         skipped('skins', error)
         return toEngine.recover(x)
       }
@@ -151,6 +163,7 @@ export const register: Register = (on, options) => {
     try {
       return await progressAbovePrompt($, e, toSkins.next)
     } catch (error) {
+      if (toSkins.isFrom(error)) throw error
       skipped('progress', error)
       return toSkins.recover(e)
     }
