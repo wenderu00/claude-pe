@@ -1,4 +1,4 @@
-import type { Flow, TaskItem, TaskStatus } from '../../types'
+import type { AgentRun, Flow, TaskItem, TaskStatus } from '../../types'
 
 // Claude's own task list, as the task tools report it: the source of the progress bar.
 
@@ -84,6 +84,22 @@ export function flowOf(list: TaskItem[]): Flow | null {
     running: list.filter(t => t.status === 'in_progress').length,
     phase: 'delegate',
     isFinished: done === list.length,
+    tasks: [],
+  }
+}
+
+// What the bar draws for the session's agents when there is no task list; null while there is no agent.
+export function crewFlow(list: AgentRun[]): Flow | null {
+  if (list.length === 0) return null
+  const running = list.filter(a => a.status === 'running')
+  const current = running[0] ?? list[list.length - 1]!
+  return {
+    title: current.description || current.type,
+    total: list.length,
+    done: list.length - running.length,
+    running: running.length,
+    phase: 'agents',
+    isFinished: running.length === 0,
     tasks: [],
   }
 }
