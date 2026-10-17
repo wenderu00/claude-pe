@@ -2,7 +2,8 @@ import type { Branch, FileNode, FileTree, Theme } from '../../types'
 import { stronger } from './icons'
 
 export type Entry = { name: string; kind: 'file' | 'dir' | 'other'; mtimeMs: number; size: number; isLink: boolean }
-export type Row = { node: FileNode; depth: number; open: boolean }
+// `lines` is the tree-line prefix drawn before the row: `├─`/`└─` under `│ ` or blanks per level.
+export type Row = { node: FileNode; depth: number; open: boolean; lines: string }
 
 const collator = new Intl.Collator(undefined, { numeric: true, sensitivity: 'base' })
 
@@ -308,15 +309,16 @@ export function visibleRows(t: FileTree): Row[] {
   }
   const open = new Set(t.expanded)
   const rows: Row[] = []
-  const walk = (dir: string, depth: number) => {
-    for (const n of kids.get(dir) ?? []) {
-      if (keep && !keep.has(n.id)) continue
+  const walk = (dir: string, depth: number, prefix: string) => {
+    const shown = (kids.get(dir) ?? []).filter(n => !keep || keep.has(n.id))
+    shown.forEach((n, i) => {
+      const last = i === shown.length - 1
       const isOpen = n.kind === 'dir' && (keep ? kids.has(n.id) : open.has(n.id))
-      rows.push({ node: n, depth, open: isOpen })
-      if (isOpen) walk(n.id, depth + 1)
-    }
+      rows.push({ node: n, depth, open: isOpen, lines: depth === 0 ? '' : prefix + (last ? '└─' : '├─') })
+      if (isOpen) walk(n.id, depth + 1, depth === 0 ? '' : prefix + (last ? '  ' : '│ '))
+    })
   }
-  walk(t.root, 0)
+  walk(t.root, 0, '')
   return rows
 }
 

@@ -3,10 +3,12 @@ import type { AbovePromptEvent, AbovePromptNext, AbovePromptResult, PartEvent, P
 import { LINUX_LAUNCH, openCommand, openWithCommand, tmuxOpenCommand } from './open'
 import type { ButtonProps } from './button'
 
-import type { Activity, FileNode, FileTree, Theme } from '../../types'
-import { BRANCH_ICON, chainOf, type GitAction, gitActions, LIGHT_TONES, readOnly, readTargets, resolve, TONES } from './git'
+import type { Activity, FileNode, FileTree } from '../../types'
+import { BRANCH_ICON, chainOf, type GitAction, gitActions, readOnly, readTargets, resolve } from './git'
 import type { RowSpec, RowsProps, Seg } from './rows'
-import { CHEVRON_CLOSED, CHEVRON_OPEN, fileIcon, GIT_COLOR, LIGHT_GIT_COLOR } from './icons'
+import { CHEVRON_CLOSED, CHEVRON_OPEN, fileCategory, fileIcon } from './icons'
+import { defaultLook, pernambucoLook } from './look'
+import { DEFAULT_PREFS } from '../command'
 import {
   age,
   ancestorsOf,
@@ -39,9 +41,10 @@ import {
 const TREE = { plugin: 'pe-devkit', key: 'filetreeTree' } as const
 const THEME = { plugin: 'pe-devkit', key: 'filetreeTheme' } as const
 const ACTIVITY = { plugin: 'pe-devkit', key: 'filetreeActivity' } as const
+// The skin's own state, written by /skin and by the theme it follows.
+const PREFS = { plugin: 'pe-devkit', key: 'prefs' } as const
+const SKIN_LIGHT = { plugin: 'pe-devkit', key: 'isLight' } as const
 const PANE = 'filetree'
-const SHIMMER = Object.fromEntries(Object.entries(TONES).map(([k, v]) => [k, { bright: v.bright, dim: v.dim }]))
-const LIGHT_SHIMMER = Object.fromEntries(Object.entries(LIGHT_TONES).map(([k, v]) => [k, { bright: v.bright, dim: v.dim }]))
 const BRANCH_ROW = '#branch'
 const FLASH_MS = 2700
 const RUNNING_MAX_MS = 600_000
@@ -52,11 +55,6 @@ const ROWS_BUDGET = 80_000
 const READ_REVEAL_LIMIT = 12
 const SEARCH_REVEAL_LIMIT = 60
 const ACTIVITY_TTL_MS = 45_000
-const ADD_COLOR = '#98c379'
-const DEL_COLOR = '#e06c75'
-const LIGHT_ADD_COLOR = '#14532d'
-const LIGHT_DEL_COLOR = '#7f1d1d'
-const LIGHT_HOVER = '#f0f2f5'
 const THEME_FILE = '.local/state/omarchy/current/theme/colors.toml'
 const THEME_POLL_MS = 2000
 const FONT_SCRIPT =
@@ -142,12 +140,6 @@ async function cwdOf($: EngineInterface): Promise<string> {
 function clean(segs: Seg[]): Seg[] {
   for (const seg of segs) for (const k of Object.keys(seg) as (keyof Seg)[]) if (seg[k] === undefined) delete seg[k]
   return segs
-}
-
-function faint(hex: string): string {
-  const v = parseInt(hex.slice(1), 16)
-  const ch = (shift: number) => Math.round(0x26 + (((v >> shift) & 255) - 0x26) * 0.3)
-  return `#${[16, 8, 0].map(x => ch(x).toString(16).padStart(2, '0')).join('')}`
 }
 
 async function readThemeSetting($: EngineInterface): Promise<void> {
@@ -1375,13 +1367,13 @@ export const register = (on: On, options: PluginOptions): void => {
     const unicode = glyphSetting === 'simples' || (glyphSetting === 'auto' && (noNerd || e.surface === 'desktop'))
     const { Box, Text, Button, Input, Client } = $.ui.resolve(e)
     const t = await get($)
-    const light = !themeMtime && e.surface !== 'desktop' && lightTerminal
-    const theme: Theme = light ? LIGHT_THEME : ((await $.state.get(THEME)).value ?? DEFAULT_THEME)
-    const tones = light ? LIGHT_TONES : TONES
-    const gitColors = light ? LIGHT_GIT_COLOR : GIT_COLOR
-    const addColor = light ? LIGHT_ADD_COLOR : ADD_COLOR
-    const delColor = light ? LIGHT_DEL_COLOR : DEL_COLOR
-    const rowColors = { activeBg: theme.selection, hoverBg: light ? LIGHT_HOVER : faint(theme.selection), tones: light ? LIGHT_SHIMMER : SHIMMER }
+    // The pernambuco skin draws the tree in its own colours, over an Omarchy theme too,
+    // on the background the skin found; the desktop app stays dark either way.
+    const skinned = ((await $.state.get(PREFS)).value?.skin ?? DEFAULT_PREFS.skin) === 'pernambuco'
+    const light = e.surface !== 'desktop' && (skinned ? Boolean((await $.state.get(SKIN_LIGHT)).value) : !themeMtime && lightTerminal)
+    const look = skinned ? pernambucoLook(light) : defaultLook(light ? LIGHT_THEME : ((await $.state.get(THEME)).value ?? DEFAULT_THEME), light)
+    const { theme, tones, git: gitColors, add: addColor, del: delColor } = look
+    const rowColors = { activeBg: theme.selection, hoverBg: look.hover, tones: Object.fromEntries(Object.entries(tones).map(([k, v]) => [k, { bright: v.bright, dim: v.dim }])) }
     // The desktop tab never hands the wheel or the scrollbar drag to the pane, so
     // there it draws every row and lets the engine scroll the body.
     nativeScroll = e.surface === 'desktop'
@@ -1482,7 +1474,8 @@ export const register = (on: On, options: PluginOptions): void => {
     ]
     const header = t.top ? [t.top.split('/').pop() ?? t.top, t.prefix.replace(/\/$/, '')].filter(Boolean).join('/') : t.root.split('/').pop() || t.root
 
-    const rowSpec = (r: (typeof rows)[number]): RowSpec => {
+    // A pinned row sits away from its parent, so its tree lines would lead nowhere.
+    const rowSpec = (r: (typeof rows)[number], pinned = false): RowSpec => {
       const n = r.node
       const own = t.git[n.id]
       const status = own ?? (underAny(dirname(n.id), untracked, t.root) ? '?' : undefined)
@@ -1515,14 +1508,15 @@ export const register = (on: On, options: PluginOptions): void => {
       const countsText = dirCounts.map(c => c.t).join('')
       const cols = Math.max(4, width - r.depth * 2 - 6 - (meta ? meta.length + 1 : 0) - locText.length - badge.length - countsText.length)
       const name = n.name.length > cols ? n.name.slice(0, cols - 1) + '…' : n.name
-      const caret = n.kind === 'dir' ? (unicode ? (r.open ? '▾' : '▸') : r.open ? CHEVRON_OPEN : CHEVRON_CLOSED) + ' ' : '  '
+      const caret = n.kind === 'dir' ? (unicode ? (r.open ? '▾' : '▸') : r.open ? CHEVRON_OPEN : CHEVRON_CLOSED) + ' ' : r.depth > 0 ? '─ ' : '  '
       const isRepo = n.kind === 'dir' && n.id === t.top
-      const glyph = unicode ? (n.kind === 'dir' ? '■' : '·') : fileIcon(n, r.open, isRepo)
+      const glyph = unicode ? (n.kind === 'dir' ? '■' : '●') : fileIcon(n, r.open, isRepo)
+      const glyphColor = unicode && n.kind !== 'dir' && !isIgnored && !gitColor && !n.hidden ? look.categories[fileCategory(n.name)] : iconColor
       const lit = isBright || isDim
       const left: Seg[] = [
-        { t: '  '.repeat(r.depth) },
+        ...(r.lines ? [{ t: pinned ? ' '.repeat(r.lines.length) : r.lines, c: theme.muted }] : []),
         { t: caret, c: theme.muted },
-        lit ? { t: glyph + ' ', sh: tone, dim: isDim, one: true } : { t: glyph + ' ', c: iconColor },
+        lit ? { t: glyph + ' ', sh: tone, dim: isDim, one: true } : { t: glyph + ' ', c: glyphColor },
         lit ? { t: name, sh: tone, dim: isDim, b: isBright } : { t: name, c: nameColor, b: n.id === t.selected, s: status === 'D' && n.kind !== 'dir' },
       ]
       const right: Seg[] = []
@@ -1537,9 +1531,9 @@ export const register = (on: On, options: PluginOptions): void => {
     const note = (text: string): RowSpec => ({ id: '', left: [{ t: text, c: theme.muted }], right: [] })
     const specs: RowSpec[] = [
       ...(rows.length === 0 ? [note('vazio')] : []),
-      ...pinned.map(rowSpec),
+      ...pinned.map(r => rowSpec(r, true)),
       ...(pinned.length > 0 ? [note('  ⋮')] : []),
-      ...shown.map(rowSpec),
+      ...shown.map(r => rowSpec(r)),
     ]
     if (nativeScroll) {
       let size = 0

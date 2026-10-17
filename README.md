@@ -86,6 +86,20 @@ Em `/config`, na seção do pe-devkit: abrir o painel de agentes sozinho, o que 
 árvore, ícones, seguir o Claude, abrir a árvore no início, a coluna da direita, dicas, com que
 programa abrir e editar arquivos, e se o Claude tem a ferramenta de navegador.
 
+### A árvore de arquivos
+
+A árvore desenha linhas (`├─`, `└─`, `│`) entre as pastas e os arquivos. No modo de ícones
+`simples`, cada arquivo tem um `●` com a cor da categoria: código, config, docs ou outros.
+As categorias só usam azul e cinza, porque verde, amarelo e vermelho são do git status.
+
+Com a skin `pernambuco`, a árvore usa as cores da Liga Digital, no terminal claro e no escuro,
+mesmo com um tema do Omarchy. O brilho do que o Claude faz também: escrever é amarelo, ler é
+azul, commit e push são verdes, erro é vermelho. Com outra skin ou com `/skin off`, a árvore
+fica com as cores de antes.
+
+Os ícones `nerd` precisam de uma Nerd Font no terminal. Sem ela, cada ícone aparece como `□`.
+Nesse caso, use `auto` (o padrão) ou `simples`.
+
 ## Atualizar o design system
 
 As versões documentadas ficam em `ds.config.json`. Para uma versão nova do `@uigovpe`:

@@ -2,6 +2,8 @@ import { expect, mock, test } from 'claude-code/testing'
 
 import { LINUX_LAUNCH, TMUX_OPEN } from '../../hooks/filetree/open'
 import { age, ancestorsOf, formatSize, replaceChildren, toNodes } from '../../hooks/filetree/tree'
+import { TOKENS } from '../../hooks/pe/ds.generated'
+import pernambuco from '../../hooks/themes/pernambuco'
 
 type World = {
   os: 'darwin' | 'linux' | 'win32'
@@ -35,6 +37,7 @@ function world(on: any, w: World, ran: Ran) {
   on('session.start', (_$: any, e: any) => ({ cwd: e.cwd }))
   on('session.cwd', () => ({ value: w.cwd }))
   on('session.id', () => ({ value: 'test-session' }))
+  on('session.usage', () => ({ value: { startedAt: 0, context: { window: 200000, percent: 10 }, rateLimits: [] } }))
   on('command.register', () => ({ value: undefined }))
   on('ui.open', (_$: any, e: any) => {
     opens.push(e)
@@ -113,6 +116,8 @@ function world(on: any, w: World, ran: Ran) {
 }
 
 const paneProps = (bodyColumns: number) => ({ title: 'Files', isFocused: false, bodyColumns, placement: 'dock', scroll: { offset: 0, bodyRows: 40 }, view: {} }) as any
+
+const skin = ($: any, args: string) => $.command.run({ command: 'skin', args, origin: { kind: 'composer' }, presentation: { isFullscreen: false, columns: 100 } })
 
 async function texts(ui: any): Promise<string> {
   const rows = JSON.stringify(await ui.drawn({ in: 'rows' }))
@@ -1127,12 +1132,13 @@ test('a written file whose name holds a newline still shimmers', { timeoutMs: 20
   await ui.unmount()
 })
 
-test('the pane takes its background from the Omarchy theme and follows a theme switch', { timeoutMs: 20_000 }, async ($, on) => {
+test('skin off: the pane takes its background from the Omarchy theme and follows a theme switch', { timeoutMs: 20_000 }, async ($, on) => {
   const ran: Ran = []
   const root = '/home/k/proj'
   const w: World = { os: 'linux', env: { HOME: '/home/k' }, cwd: root, top: '', dirs: { [root]: [['a.ts', 'file']] }, status: '', numstat: '', theme: { toml: 'background = "#1e1e2e"\ndark_background = "#161622"\n', mtimeMs: 1 } }
   const clock = world(on, w, ran)
   await $.session.start({ cwd: root, surface: 'terminal', isInteractive: true })
+  await skin($, 'off')
   await clock.settle()
   const ui = await $.ui.mount({ plugin: 'pe-devkit', surface: 'terminal', component: 'Pane', requestId: 'filetree', props: paneProps(60) })
   await clock.settle()
@@ -1162,7 +1168,7 @@ test('without an Omarchy theme the pane keeps the terminal background and nothin
   await ui.unmount()
 })
 
-test('a light theme setting draws every color at AAA contrast in the terminal, and the desktop app and a dark theme keep the dark palette', { timeoutMs: 20_000 }, async ($, on) => {
+test('skin off: a light theme setting draws every color at AAA contrast in the terminal, and the desktop app and a dark theme keep the dark palette', { timeoutMs: 20_000 }, async ($, on) => {
   const ran: Ran = []
   const root = '/Users/k/proj'
   const clock = world(on, {
@@ -1177,6 +1183,7 @@ test('a light theme setting draws every color at AAA contrast in the terminal, a
     return { value: e.value }
   })
   await $.session.start({ cwd: root, surface: 'terminal', isInteractive: true })
+  await skin($, 'off')
   await clock.settle()
   let ui = await $.ui.mount({ plugin: 'pe-devkit', surface: 'terminal', component: 'Pane', requestId: 'filetree', props: paneProps(60) })
   await clock.settle()
@@ -1423,5 +1430,118 @@ test('files a Grep or Glob search returns shimmer as reads, relative names resol
   await $.tool.call({ tool: 'Glob', pattern: '*.ts' } as any)
   await clock.settle()
   expect(await texts(ui)).toContain(shimmer('a.ts', 'purple'))
+  await ui.unmount()
+})
+
+// The pernambuco skin is the default, so a session that never ran /skin draws the tree in it.
+const DS = (scheme: 'light' | 'dark', name: string) => TOKENS[scheme][name]!
+const PE_WORLD = (root: string): World => ({
+  os: 'linux', env: { HOME: '/home/k' }, cwd: root, top: root,
+  dirs: {
+    [root]: [['src', 'dir'], ['package.json', 'file'], ['README.md', 'file'], ['logo.png', 'file']],
+    [`${root}/src`]: [['a.ts', 'file'], ['b.ts', 'file']],
+  },
+  status: '## main\0 M src/a.ts\0', numstat: '3\t1\tsrc/a.ts\0',
+})
+const tonesOf = (shown: string, tone: string) => shown.match(new RegExp(String.raw`"${tone}":\{"bright":\[([^\]]*)\]`))?.[1] ?? ''
+
+async function peTree($: any, on: any, w: World, theme = 'dark') {
+  const ran: Ran = []
+  on('config.list', () => ({ value: [{ key: 'theme', label: 'Theme', kind: 'choice', value: theme, provider: { plugin: 'engine', tier: 'core' }, isLocked: false }] as any }))
+  const clock = world(on, w, ran)
+  await $.session.start({ cwd: w.cwd, surface: 'terminal', isInteractive: true })
+  await clock.settle()
+  const ui = await $.ui.mount({ plugin: 'pe-devkit', surface: 'terminal', component: 'Pane', requestId: 'filetree', props: paneProps(60) })
+  await clock.settle()
+  await ui.post({ press: `${w.cwd}/src` }, { in: 'rows' })
+  await clock.settle()
+  return { clock, ui }
+}
+
+test('pernambuco skin, dark: tree lines, a ● per file in its category colour, and the chrome and git in the skin colours', { timeoutMs: 20_000 }, async ($, on) => {
+  const root = '/home/k/proj'
+  const { ui } = await peTree($, on, PE_WORLD(root))
+  const shown = await texts(ui)
+  expect(shown).toContain('"t":"├─"')
+  expect(shown).toContain('"t":"└─"')
+  expect(shown).not.toContain('{"t":"",')
+  expect(shown).toContain(`{"t":"● ","c":"${DS('dark', '--color-light-blue-softer')}"}`)
+  expect(shown).toContain(`{"t":"● ","c":"${DS('dark', '--color-light-blue-softest')}"}`)
+  expect(shown).toContain(`{"t":"● ","c":"${DS('dark', '--color-light-gray-soft')}"}`)
+  expect(shown).toContain(`{"t":"● ","c":"${pernambuco.palette.muted}"}`)
+  expect(shown).toContain(`"activeBg":"${pernambuco.palette.surface}","hoverBg":"${pernambuco.palette.zebra}"`)
+  expect(shown).toContain(`{"t":"a.ts","c":"${pernambuco.palette.warn}"`)
+  expect(shown).toContain(`{"t":" +3","c":"${pernambuco.palette.ok}"}`)
+  expect(shown).toContain(`{"t":" -1","c":"${pernambuco.palette.err}"}`)
+  expect(shown).toContain(`"color":"${pernambuco.palette.user}"`)
+  for (const old of ['#5b9bd5', '#e5c07b', '#808a96', '#6b7280']) expect(shown).not.toContain(old)
+  await ui.unmount()
+})
+
+test('pernambuco skin, light theme: the light tokens are drawn', { timeoutMs: 20_000 }, async ($, on) => {
+  const root = '/home/k/proj'
+  const { ui } = await peTree($, on, PE_WORLD(root), 'light')
+  const shown = await texts(ui)
+  const light = pernambuco.light!
+  expect(shown).toContain(`"activeBg":"${light.surface}","hoverBg":"${light.zebra}"`)
+  expect(shown).toContain(`{"t":"● ","c":"${DS('light', '--color-dark-blue-softest')}"}`)
+  expect(shown).toContain(`{"t":"a.ts","c":"${light.warn}"`)
+  expect(shown).not.toContain(`"activeBg":"${pernambuco.palette.surface}"`)
+  await ui.unmount()
+})
+
+test('/skin off brings back the plain tree colours, and /skin on brings Pernambuco back without a restart', { timeoutMs: 20_000 }, async ($, on) => {
+  const root = '/home/k/proj'
+  const { clock, ui } = await peTree($, on, PE_WORLD(root))
+  await skin($, 'off')
+  await clock.settle()
+  const off = await texts(ui)
+  expect(off).toContain('"activeBg":"#6b7280"')
+  expect(off).toContain('{"t":"a.ts","c":"#e5c07b"')
+  expect(off).toContain('"t":"├─"')
+  expect(off).not.toContain(DS('dark', '--color-light-blue-softer'))
+  await skin($, 'on')
+  await clock.settle()
+  const back = await texts(ui)
+  expect(back).toContain(`"activeBg":"${pernambuco.palette.surface}"`)
+  expect(back).not.toContain('#e5c07b')
+  await ui.unmount()
+})
+
+test('pernambuco skin wins over an Omarchy theme file', { timeoutMs: 20_000 }, async ($, on) => {
+  const root = '/home/k/proj'
+  const w = { ...PE_WORLD(root), theme: { toml: 'background = "#1e1e2e"\ndark_background = "#161622"\naccent = "#ff00ff"\n', mtimeMs: 1 } }
+  const { ui } = await peTree($, on, w)
+  const shown = await texts(ui)
+  expect(shown).not.toContain('#161622')
+  expect(shown).not.toContain('#ff00ff')
+  expect(shown).toContain(`"activeBg":"${pernambuco.palette.surface}"`)
+  await ui.unmount()
+})
+
+test('nerd glyphs keep their icons and get the tree lines too', { timeoutMs: 20_000, options: { glyphs: 'nerd' } }, async ($, on) => {
+  const root = '/home/k/proj'
+  const { ui } = await peTree($, on, PE_WORLD(root))
+  const shown = await texts(ui)
+  expect(NERD.test(shown)).toBe(true)
+  expect(shown).toContain('"t":"├─"')
+  expect(shown).toContain('"t":"└─"')
+  expect(shown).not.toContain('"t":"● "')
+  await ui.unmount()
+})
+
+test('pernambuco skin: a read shimmers blue and a write shimmers yellow', { timeoutMs: 20_000 }, async ($, on) => {
+  const root = '/home/k/proj'
+  const { clock, ui } = await peTree($, on, PE_WORLD(root))
+  await $.tool.call({ tool: 'Read', file_path: `${root}/src/b.ts` } as any)
+  await clock.settle()
+  let shown = await texts(ui)
+  expect(shown).toContain(shimmer('b.ts', 'purple'))
+  expect(tonesOf(shown, 'purple')).toContain(DS('dark', '--color-light-blue-softer'))
+  await $.tool.call({ tool: 'Write', file_path: `${root}/README.md`, content: 'x' } as any)
+  await clock.settle()
+  shown = await texts(ui)
+  expect(shown).toContain(shimmer('README.md', 'orange'))
+  expect(tonesOf(shown, 'orange')).toContain(DS('dark', '--color-light-yellow-soft'))
   await ui.unmount()
 })
