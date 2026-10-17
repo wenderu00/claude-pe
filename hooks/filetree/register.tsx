@@ -1,8 +1,9 @@
-import { type BuiltinToolResults, type EngineInterface, type Register, type Timer, update } from 'claude-code'
+import { type BuiltinToolResults, type EngineInterface, type On, type PluginOptions, type Timer, update } from 'claude-code'
+import type { AbovePromptEvent, AbovePromptNext, AbovePromptResult, PartEvent, PartNext, PartResult } from '../parts'
 import { LINUX_LAUNCH, openCommand, openWithCommand, tmuxOpenCommand } from './open'
 import type { ButtonProps } from './button'
 
-import type { Activity, FileNode, FileTree, Theme } from '../types'
+import type { Activity, FileNode, FileTree, Theme } from '../../types'
 import { BRANCH_ICON, chainOf, type GitAction, gitActions, LIGHT_TONES, readOnly, readTargets, resolve, TONES } from './git'
 import type { RowSpec, RowsProps, Seg } from './rows'
 import { CHEVRON_CLOSED, CHEVRON_OPEN, fileIcon, GIT_COLOR, LIGHT_GIT_COLOR } from './icons'
@@ -35,9 +36,9 @@ import {
   visibleRows,
 } from './tree'
 
-const TREE = { plugin: 'filetree', key: 'tree' } as const
-const THEME = { plugin: 'filetree', key: 'theme' } as const
-const ACTIVITY = { plugin: 'filetree', key: 'activity' } as const
+const TREE = { plugin: 'pe-devkit', key: 'filetreeTree' } as const
+const THEME = { plugin: 'pe-devkit', key: 'filetreeTheme' } as const
+const ACTIVITY = { plugin: 'pe-devkit', key: 'filetreeActivity' } as const
 const PANE = 'filetree'
 const SHIMMER = Object.fromEntries(Object.entries(TONES).map(([k, v]) => [k, { bright: v.bright, dim: v.dim }]))
 const LIGHT_SHIMMER = Object.fromEntries(Object.entries(LIGHT_TONES).map(([k, v]) => [k, { bright: v.bright, dim: v.dim }]))
@@ -768,6 +769,8 @@ function scheduleScan($: EngineInterface, job: Job): void {
       scanJobs = []
       try {
         await afterBash($, jobs)
+      } catch (error) {
+        $.ui.log(`pe-devkit: filetree scan failed: ${error instanceof Error ? error.message : String(error)}`)
       } finally {
         const marks = jobs.map(j => j.since.mark).filter(Boolean)
         if (marks.length) await $.process.run(['rm', '-f', ...marks], { timeoutMs: 3_000 }).catch(() => undefined)
@@ -1105,50 +1108,146 @@ function shortPath(path: string): string {
   return home && inside(home, path) ? `~${path.slice(home.length)}` : path
 }
 
-export const register: Register = (on, options) => {
+export async function filetreeSessionStart($: EngineInterface, e: PartEvent<'session.start'>, next: PartNext<'session.start'>): PartResult<'session.start'> {
+  await $.command.register({ name: 'filetree', description: 'Show the file tree; args: [path] (no path = cwd)' })
+  const windows = (await $.env.get('OS')) === 'Windows_NT'
+  useDrives(windows)
+  inTmux = !windows && Boolean(await $.env.get('TMUX'))
+  home = posix(((await $.env.get('HOME')) || (await $.env.get('USERPROFILE')) || '').replace(/[\\/]+$/, ''))
+  activityId = Math.max(activityId, ...(await activities($)).map(a => a.id))
+  void (async () => {
+    pointer = await finePointerOk($)
+    try {
+      const remote = Boolean((await $.env.get('SSH_CONNECTION')) || (await $.env.get('SSH_TTY')))
+      noNerd = !remote && (windows || (await fontState($, 'f04eb')) !== 'ok')
+    } catch {
+      noNerd = true
+    }
+    await loadTheme($)
+    await readThemeSetting($).catch(() => undefined)
+    themePoll?.cancel()
+    themePoll = themeMtime ? $.clock.every(THEME_POLL_MS, () => void loadTheme($)) : null
+    ageTick?.cancel()
+    ageTick = showAge ? $.clock.every(AGE_TICK_MS, () => $.ui.invalidate('ui.render')) : null
+    const t = await get($)
+    if (t.flashOn) await patch($, () => ({ flash: [], flashDim: [], flashOn: false, flashTones: {} }))
+    if (t.preview) await patch($, () => ({ preview: '', previewTop: 0 }))
+    await setActivities($, cur => cur.map(a => (a.state === 'running' ? { ...a, state: 'failed', label: `${a.kind} interrupted` } : a)))
+    const cwd = await cwdOf($)
+    if (!t.root || t.nodes.length === 0 || (follow && t.root !== cwd)) await reset($, cwd)
+    else if (!noDock) await $.ui.open({ id: PANE, title: `Files: ${t.root.split('/').pop() || t.root}` })
+  })()
+  return next(e)
+}
+
+export async function filetreeToolCall($: EngineInterface, e: PartEvent<'tool.call'>, next: PartNext<'tool.call'>): PartResult<'tool.call'> {
+  const shell = e.tool === 'Bash' || e.tool === 'PowerShell'
+  if (e.tool !== 'Edit' && e.tool !== 'Write' && e.tool !== 'NotebookEdit' && !shell) return next(e)
+  const command = e.tool === 'Bash' || e.tool === 'PowerShell' ? e.command : ''
+  const cwd = shell ? await cwdOf($) : ''
+  const actions = gitActions(command)
+  const quiet = !actions.length && readOnly(command)
+  const since = await sinceNow($, shell && !quiet)
+  const before = actions.some(a => a.verb === 'commit') ? await get($) : null
+  const head = before?.top ? await headOf($, before.root) : ''
+  const pending: Pending | null = actions.length ? { actions, ids: await startGit($, actions), command, head } : null
+  let result: Awaited<ReturnType<typeof next>>
+  try {
+    result = await next(e)
+  } catch (err) {
+    if (pending) await finishGit($, pending, failAll(pending))
+    if (since.mark) void $.process.run(['rm', '-f', since.mark], { timeoutMs: 3_000 }).catch(() => undefined)
+    throw err
+  }
+  if (pending && result.deny) {
+    const ids = pending.ids
+    void setActivities($, cur => cur.filter(a => !ids.includes(a.id)))
+  }
+  if (result.deny || (result.isError && !shell)) {
+    if (since.mark) void $.process.run(['rm', '-f', since.mark], { timeoutMs: 3_000 }).catch(() => undefined)
+    return result
+  }
+  if (shell) {
+    const out: Partial<BuiltinToolResults['Bash']> = !result.isError && result.result && typeof result.result === 'object' ? (result.result as Partial<BuiltinToolResults['Bash']>) : {}
+    const reads = showReads ? readTargets(command, cwd, typeof out.stdout === 'string' ? out.stdout : '', home) : []
+    const job: Job = { actions: [], since, initRepo: actions.some(a => a.init), readOnly: quiet || result.isReadOnly === true }
+    if (out.backgroundTaskId) background.set(out.backgroundTaskId, { p: pending, job, reads })
+    else void (async () => {
+      const results = pending ? await outcomes($, pending, !result.isError, out.gitOperation) : []
+      if (pending) await finishGit($, pending, results)
+      queuedReads.push(...reads)
+      scheduleScan($, { ...job, actions: proven(pending, results) })
+    })()
+    if (follow && /(^|[;&|\s])(cd|pushd|popd)(\s|$)/.test(command)) $.clock.after(400, () => void followCwd($))
+  } else {
+    const file =
+      'file_path' in e && typeof e.file_path === 'string'
+        ? e.file_path
+        : 'notebook_path' in e && typeof e.notebook_path === 'string'
+          ? e.notebook_path
+          : ''
+    if (file) void touched($, [file], 'orange', showWrites)
+  }
+  return result
+}
+
+export async function filetreeUiMessage($: EngineInterface, e: PartEvent<'ui.message'>, next: PartNext<'ui.message'>): PartResult<'ui.message'> {
+  if (e.requestId === PANE && e.element.startsWith('button-') && e.data && typeof e.data === 'object') {
+    const id = e.element.slice('button-'.length)
+    const data = e.data as { over?: unknown; press?: unknown }
+    if (data.press) await pressHeader($, id)
+    else if (data.over === true || hovered === id) {
+      hovered = data.over === true ? id : ''
+      void $.ui.invalidate('ui.render')
+    }
+    return {}
+  }
+  if (e.requestId !== PANE || e.element !== 'rows' || !e.data || typeof e.data !== 'object') return next(e)
+  const data = e.data as { press?: unknown; key?: unknown; ctrl?: unknown; shift?: unknown; scrollTo?: unknown; copy?: unknown }
+  void sync($)
+  const t = await get($)
+  if (typeof data.copy === 'string') {
+    await copyPath($, data.copy, Boolean(data.shift), e.surface)
+    return {}
+  }
+  if (typeof data.scrollTo === 'number') {
+    const to = Math.round(Math.max(0, Math.min(1, data.scrollTo)) * view.max)
+    if (to !== t.scroll) await patch($, () => ({ scroll: to }))
+    return {}
+  }
+  if (typeof data.press === 'string') {
+    const n = t.nodes.find(x => x.id === data.press)
+    if (!n) return {}
+    if (t.scroll === null) await patch($, () => ({ scroll: view.from }))
+    if (data.ctrl || data.shift) await openNode($, n)
+    else await press($, n)
+    return {}
+  }
+  if (typeof data.key !== 'string') return {}
+  if (t.preview) {
+    const page = Math.max(1, previewRows - 2)
+    const by: Record<string, number> = { up: -1, k: -1, down: 1, j: 1, f: page, b: -page, pageup: -page, pagedown: page, home: -Infinity, end: Infinity }
+    if (data.key === 'left' || data.key === 'h') await closePreview($)
+    else if (data.key === 'e') await editPreview($, t.preview)
+    else if (data.key in by) await scrollPreview($, by[data.key] ?? 0)
+    return {}
+  }
+  await navigate($, data.key, Boolean(data.shift), e.surface)
+  return {}
+}
+
+export const register = (on: On, options: PluginOptions): void => {
   glyphSetting = typeof options?.glyphs === 'string' ? options.glyphs : 'auto'
-  const activity = typeof options?.activity === 'string' ? options.activity : 'reads and writes'
-  showReads = activity.includes('reads')
-  showWrites = activity.includes('writes')
-  followClaude = options?.follow !== 'off'
-  sizeDefault = options?.column === 'size'
-  showAge = options?.column === 'age'
-  showHints = options?.hints !== 'off'
+  const activity = typeof options?.activity === 'string' ? options.activity : 'leituras e escritas'
+  showReads = activity.includes('leituras')
+  showWrites = activity.includes('escritas')
+  followClaude = options?.follow !== 'não'
+  sizeDefault = options?.column === 'tamanho'
+  showAge = options?.column === 'idade'
+  showHints = options?.hints !== 'não'
   openWithSetting = typeof options?.open === 'string' ? options.open : ''
   editWithSetting = typeof options?.edit === 'string' ? options.edit.trim() : ''
-  noDock = options?.start === 'off'
-  on('session.start', async ($, e, next) => {
-    await $.command.register({ name: 'filetree', description: 'Show the file tree; args: [path] (no path = cwd)' })
-    const windows = (await $.env.get('OS')) === 'Windows_NT'
-    useDrives(windows)
-    inTmux = !windows && Boolean(await $.env.get('TMUX'))
-    home = posix(((await $.env.get('HOME')) || (await $.env.get('USERPROFILE')) || '').replace(/[\\/]+$/, ''))
-    activityId = Math.max(activityId, ...(await activities($)).map(a => a.id))
-    void (async () => {
-      pointer = await finePointerOk($)
-      try {
-        const remote = Boolean((await $.env.get('SSH_CONNECTION')) || (await $.env.get('SSH_TTY')))
-        noNerd = !remote && (windows || (await fontState($, 'f04eb')) !== 'ok')
-      } catch {
-        noNerd = true
-      }
-      await loadTheme($)
-      await readThemeSetting($).catch(() => undefined)
-      themePoll?.cancel()
-      themePoll = themeMtime ? $.clock.every(THEME_POLL_MS, () => void loadTheme($)) : null
-      ageTick?.cancel()
-      ageTick = showAge ? $.clock.every(AGE_TICK_MS, () => $.ui.invalidate('ui.render')) : null
-      const t = await get($)
-      if (t.flashOn) await patch($, () => ({ flash: [], flashDim: [], flashOn: false, flashTones: {} }))
-      if (t.preview) await patch($, () => ({ preview: '', previewTop: 0 }))
-      await setActivities($, cur => cur.map(a => (a.state === 'running' ? { ...a, state: 'failed', label: `${a.kind} interrupted` } : a)))
-      const cwd = await cwdOf($)
-      if (!t.root || t.nodes.length === 0 || (follow && t.root !== cwd)) await reset($, cwd)
-      else if (!noDock) await $.ui.open({ id: PANE, title: `Files: ${t.root.split('/').pop() || t.root}` })
-    })()
-    return next(e)
-  })
-
+  noDock = options?.start === 'não'
   on('config.set', { key: 'theme' }, async ($, e, next) => {
     const result = await next(e)
     await readThemeSetting($).catch(() => undefined)
@@ -1170,57 +1269,6 @@ export const register: Register = (on, options) => {
     return { text: `File tree on ${shortPath(root)}${follow ? ' (follows the cwd)' : ''}.` }
   })
 
-  on('tool.call', async ($, e, next) => {
-    const shell = e.tool === 'Bash' || e.tool === 'PowerShell'
-    if (e.tool !== 'Edit' && e.tool !== 'Write' && e.tool !== 'NotebookEdit' && !shell) return next(e)
-    const command = e.tool === 'Bash' || e.tool === 'PowerShell' ? e.command : ''
-    const cwd = shell ? await cwdOf($) : ''
-    const actions = gitActions(command)
-    const quiet = !actions.length && readOnly(command)
-    const since = await sinceNow($, shell && !quiet)
-    const before = actions.some(a => a.verb === 'commit') ? await get($) : null
-    const head = before?.top ? await headOf($, before.root) : ''
-    const pending: Pending | null = actions.length ? { actions, ids: await startGit($, actions), command, head } : null
-    let result: Awaited<ReturnType<typeof next>>
-    try {
-      result = await next(e)
-    } catch (err) {
-      if (pending) await finishGit($, pending, failAll(pending))
-      if (since.mark) void $.process.run(['rm', '-f', since.mark], { timeoutMs: 3_000 }).catch(() => undefined)
-      throw err
-    }
-    if (pending && result.deny) {
-      const ids = pending.ids
-      void setActivities($, cur => cur.filter(a => !ids.includes(a.id)))
-    }
-    if (result.deny || (result.isError && !shell)) {
-      if (since.mark) void $.process.run(['rm', '-f', since.mark], { timeoutMs: 3_000 }).catch(() => undefined)
-      return result
-    }
-    if (shell) {
-      const out: Partial<BuiltinToolResults['Bash']> = !result.isError && result.result && typeof result.result === 'object' ? (result.result as Partial<BuiltinToolResults['Bash']>) : {}
-      const reads = showReads ? readTargets(command, cwd, typeof out.stdout === 'string' ? out.stdout : '', home) : []
-      const job: Job = { actions: [], since, initRepo: actions.some(a => a.init), readOnly: quiet || result.isReadOnly === true }
-      if (out.backgroundTaskId) background.set(out.backgroundTaskId, { p: pending, job, reads })
-      else void (async () => {
-        const results = pending ? await outcomes($, pending, !result.isError, out.gitOperation) : []
-        if (pending) await finishGit($, pending, results)
-        queuedReads.push(...reads)
-        scheduleScan($, { ...job, actions: proven(pending, results) })
-      })()
-      if (follow && /(^|[;&|\s])(cd|pushd|popd)(\s|$)/.test(command)) $.clock.after(400, () => void followCwd($))
-    } else {
-      const file =
-        'file_path' in e && typeof e.file_path === 'string'
-          ? e.file_path
-          : 'notebook_path' in e && typeof e.notebook_path === 'string'
-            ? e.notebook_path
-            : ''
-      if (file) void touched($, [file], 'orange', showWrites)
-    }
-    return result
-  })
-
   on('tool.call', { tool: 'Read' }, async ($, e, next) => {
     const result = await next(e)
     if (result.deny || result.isError || e.tool !== 'Read' || !showReads) return result
@@ -1238,51 +1286,6 @@ export const register: Register = (on, options) => {
       void touched($, names.slice(0, SEARCH_REVEAL_LIMIT).map(f => resolve(cwd, posix(f), home)), 'purple', true)
       return result
     })
-
-  on('ui.message', async ($, e, next) => {
-    if (e.requestId === PANE && e.element.startsWith('button-') && e.data && typeof e.data === 'object') {
-      const id = e.element.slice('button-'.length)
-      const data = e.data as { over?: unknown; press?: unknown }
-      if (data.press) await pressHeader($, id)
-      else if (data.over === true || hovered === id) {
-        hovered = data.over === true ? id : ''
-        void $.ui.invalidate('ui.render')
-      }
-      return {}
-    }
-    if (e.requestId !== PANE || e.element !== 'rows' || !e.data || typeof e.data !== 'object') return next(e)
-    const data = e.data as { press?: unknown; key?: unknown; ctrl?: unknown; shift?: unknown; scrollTo?: unknown; copy?: unknown }
-    void sync($)
-    const t = await get($)
-    if (typeof data.copy === 'string') {
-      await copyPath($, data.copy, Boolean(data.shift), e.surface)
-      return {}
-    }
-    if (typeof data.scrollTo === 'number') {
-      const to = Math.round(Math.max(0, Math.min(1, data.scrollTo)) * view.max)
-      if (to !== t.scroll) await patch($, () => ({ scroll: to }))
-      return {}
-    }
-    if (typeof data.press === 'string') {
-      const n = t.nodes.find(x => x.id === data.press)
-      if (!n) return {}
-      if (t.scroll === null) await patch($, () => ({ scroll: view.from }))
-      if (data.ctrl || data.shift) await openNode($, n)
-      else await press($, n)
-      return {}
-    }
-    if (typeof data.key !== 'string') return {}
-    if (t.preview) {
-      const page = Math.max(1, previewRows - 2)
-      const by: Record<string, number> = { up: -1, k: -1, down: 1, j: 1, f: page, b: -page, pageup: -page, pagedown: page, home: -Infinity, end: Infinity }
-      if (data.key === 'left' || data.key === 'h') await closePreview($)
-      else if (data.key === 'e') await editPreview($, t.preview)
-      else if (data.key in by) await scrollPreview($, by[data.key] ?? 0)
-      return {}
-    }
-    await navigate($, data.key, Boolean(data.shift), e.surface)
-    return {}
-  })
 
   on('classic.SessionStart', async ($, e, next) => {
     const result = await next(e)
@@ -1369,7 +1372,7 @@ export const register: Register = (on, options) => {
       const { Box: Empty } = $.ui.resolve(e)
       return <Empty />
     }
-    const unicode = glyphSetting === 'plain' || (glyphSetting === 'auto' && (noNerd || e.surface === 'desktop'))
+    const unicode = glyphSetting === 'simples' || (glyphSetting === 'auto' && (noNerd || e.surface === 'desktop'))
     const { Box, Text, Button, Input, Client } = $.ui.resolve(e)
     const t = await get($)
     const light = !themeMtime && e.surface !== 'desktop' && lightTerminal

@@ -6,7 +6,7 @@ import { bodyOf, chunksOf, inputFields, isOpen, unifiedDiff } from '../hooks/det
 
 // Opened tool rows: the chevron, the call's input in full and its answer.
 
-const SITE = { plugin: 'skins', viewport: { columns: 100, rows: 30 } } as const
+const SITE = { plugin: 'pe-devkit', viewport: { columns: 100, rows: 30 } } as const
 
 const STOCK: RenderElement = { type: 'Text', props: {}, children: ['stock row'] }
 

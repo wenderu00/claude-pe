@@ -1,4 +1,4 @@
-import type { Skin } from '../skin'
+import type { Skin } from '../../../hooks/skin'
 
 const skin: Skin = {
   name: 'tokyo-night',

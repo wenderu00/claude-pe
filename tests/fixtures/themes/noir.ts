@@ -1,4 +1,4 @@
-import type { Skin } from '../skin'
+import type { Skin } from '../../../hooks/skin'
 
 // Black and white, and white and black on a light background.
 const skin: Skin = {

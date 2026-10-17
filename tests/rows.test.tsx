@@ -2,15 +2,14 @@ import type { On, RenderElement } from 'claude-code'
 import { expect, mock, test } from 'claude-code/testing'
 import type { Engine, Plugin } from 'claude-code/testing'
 
-import { DESIGN_TOOL } from '../hooks/designer'
 import { widthOf } from '../hooks/markdown'
 import { mermaidArt } from '../hooks/mermaid-art'
+import pernambuco from '../hooks/themes/pernambuco'
 import { literal } from '../hooks/rows'
-import noir from '../hooks/themes/noir'
 
 const SURFACES = ['terminal', 'desktop'] as const
 
-const SITE = { plugin: 'skins', viewport: { columns: 100, rows: 30 } } as const
+const SITE = { plugin: 'pe-devkit', viewport: { columns: 100, rows: 30 } } as const
 
 // Stands for what Claude Code would draw wherever the skin hands a row back.
 const STOCK: RenderElement = { type: 'Text', props: {}, children: ['stock row'] }
@@ -394,7 +393,7 @@ test('the markdown pack draws alerts and task lists everywhere, headings and par
 
   const terminal = await $.ui.mount(reply('terminal'))
   expect(await terminal.find({ type: 'Text', text: '▍ Plan' })).toBeDefined()
-  expect(spanColor((await terminal.find({ type: 'Text', text: /Ran 54 tests/ })) as Found, '3.2s')).toBe('#f5f5f5')
+  expect(spanColor((await terminal.find({ type: 'Text', text: /Ran 54 tests/ })) as Found, '3.2s')).toBe(pernambuco.palette.user)
   expect(await terminal.find({ type: 'Text', text: '▲ Warning' })).toBeDefined()
   expect(JSON.stringify(await terminal.find({ type: 'Box' }))).toContain('"borderStyle":"round"')
   expect(await terminal.find({ type: 'Text', text: '☑ ' })).toBeDefined()
@@ -552,13 +551,13 @@ test('the settings pane picks a skin, switches the rail and paints a slot', asyn
   stubEngine(on)
 
   const pane = await $.ui.mount({ ...PANE, surface: 'terminal' })
-  await pane.press({ key: 'skin-dracula' })
+  await pane.press({ key: 'skin-pernambuco' })
   await pane.press({ key: 'toggle-rail' })
   await pane.unmount()
 
   const row = await $.ui.mount(toolUse(call('Bash', { command: 'ls' })))
   const found = await row.find({ type: 'Text', text: /Bash/ })
-  expect(spanColor(found, 'Bash')).toBe('#f1fa8c')
+  expect(spanColor(found, 'Bash')).toBe(pernambuco.palette.run)
   expect(await row.find({ type: 'Text', text: '┃' })).toBeUndefined()
   await row.unmount()
 
@@ -566,26 +565,7 @@ test('the settings pane picks a skin, switches the rail and paints a slot', asyn
   await again.input({ key: 'hex', text: '#ff0000' })
   await again.unmount()
 
-  expect((await runSkin($, 'list')).text).toContain('● my-dracula')
-})
-
-test('the agent’s design tool saves a skin and it applies at once', async ($, on) => {
-  stubEngine(on)
-
-  const out = await $.tool.call({
-    tool: 'mcp__skins__design',
-    action: 'save',
-    name: 'sunset',
-    base: 'gruvbox',
-    palette: { run: '#ff8800' },
-  })
-  expect(out.deny).toBeUndefined()
-
-  const row = await $.ui.mount(toolUse(call('Bash', { command: 'ls' })))
-  expect(spanColor(await row.find({ type: 'Text', text: /Bash/ }), 'Bash')).toBe('#ff8800')
-
-  const refused = await $.tool.call({ tool: 'mcp__skins__design', action: 'save', name: 'dracula' })
-  expect(refused.deny).toContain('built-in')
+  expect((await runSkin($, 'list')).text).toContain('● my-pernambuco')
 })
 
 test('/skin with no argument opens the settings pane', async ($, on) => {
@@ -770,7 +750,7 @@ test('a code fence is a card on the desktop, highlighted rows in the terminal, m
 
   const terminal = await $.ui.mount(reply('terminal'))
   expect(await terminal.find({ type: 'Svg' })).toBeUndefined()
-  expect(spanColor((await terminal.find({ type: 'Text', text: 'const a = 1' })) as Found, 'const')).toBe(noir.palette.web)
+  expect(spanColor((await terminal.find({ type: 'Text', text: 'const a = 1' })) as Found, 'const')).toBe(pernambuco.palette.web)
   await terminal.unmount()
 
   await runSkin($, 'highlight off')
@@ -1105,7 +1085,7 @@ test('on a light Claude Code theme the skin draws dark text for a light backgrou
   await $.session.start({ surface: 'terminal', isInteractive: true, cwd: '/work' })
 
   const row = await $.ui.mount(toolUse(call('Bash', { command: 'ls' })))
-  expect(spanColor(await row.find({ type: 'Text', text: /Bash/ }), 'Bash')).toBe('#111111')
+  expect(spanColor(await row.find({ type: 'Text', text: /Bash/ }), 'Bash')).toBe(pernambuco.light!.run)
 })
 
 test('code blocks, tables and shell output get a Copy button that copies their text', async ($, on) => {
@@ -1173,12 +1153,12 @@ test('an auto theme follows the system, and SKINS_THEME overrides the setting', 
 
   await $.session.start({ surface: 'desktop', isInteractive: true, cwd: '/work' })
   const light = await $.ui.mount(toolUse(call('Bash', { command: 'ls' })))
-  expect(spanColor(await light.find({ type: 'Text', text: /Bash/ }), 'Bash')).toBe('#111111')
+  expect(spanColor(await light.find({ type: 'Text', text: /Bash/ }), 'Bash')).toBe(pernambuco.light!.run)
 
   override = 'dark'
   await $.session.start({ surface: 'desktop', isInteractive: true, cwd: '/work' })
   const dark = await $.ui.mount({ ...toolUse(call('Bash', { command: 'ls' })), requestId: 'again' })
-  expect(spanColor(await dark.find({ type: 'Text', text: /Bash/ }), 'Bash')).toBe('#ededed')
+  expect(spanColor(await dark.find({ type: 'Text', text: /Bash/ }), 'Bash')).toBe(pernambuco.palette.run)
 })
 
 test('a theme set mid-session is drawn at once, though the settings list still holds the old one', async ($, on) => {
@@ -1194,7 +1174,7 @@ test('a theme set mid-session is drawn at once, though the settings list still h
   await $.config.set({ key: 'theme', value: 'dark' } as never)
 
   const row = await $.ui.mount(toolUse(call('Bash', { command: 'ls' })))
-  expect(spanColor(await row.find({ type: 'Text', text: /Bash/ }), 'Bash')).toBe('#ededed')
+  expect(spanColor(await row.find({ type: 'Text', text: /Bash/ }), 'Bash')).toBe(pernambuco.palette.run)
 })
 
 test('an auto theme follows the system when it changes mid-session', async ($, on) => {
@@ -1212,13 +1192,13 @@ test('an auto theme follows the system when it changes mid-session', async ($, o
 
   await $.session.start({ surface: 'desktop', isInteractive: true, cwd: '/work' })
   const before = await $.ui.mount(toolUse(call('Bash', { command: 'ls' })))
-  expect(spanColor(await before.find({ type: 'Text', text: /Bash/ }), 'Bash')).toBe('#111111')
+  expect(spanColor(await before.find({ type: 'Text', text: /Bash/ }), 'Bash')).toBe(pernambuco.light!.run)
 
   isDark = true
   await clock.advance(5000)
 
   const after = await $.ui.mount({ ...toolUse(call('Bash', { command: 'ls' })), requestId: 'after' })
-  expect(spanColor(await after.find({ type: 'Text', text: /Bash/ }), 'Bash')).toBe('#ededed')
+  expect(spanColor(await after.find({ type: 'Text', text: /Bash/ }), 'Bash')).toBe(pernambuco.palette.run)
 })
 
 test('/skin pin keeps a look to this folder, /skin unpin returns to the default', async ($, on) => {
@@ -1236,16 +1216,16 @@ test('/skin pin keeps a look to this folder, /skin unpin returns to the default'
 
   await $.session.start({ surface: 'terminal', isInteractive: true, cwd: '/work' })
   await runSkin($, 'pin')
-  await runSkin($, 'nord')
+  await runSkin($, 'off')
 
-  expect((store.folders as Record<string, { skin: string }>)['/work']?.skin).toBe('nord')
+  expect((store.folders as Record<string, { skin: string }>)['/work']?.skin).toBe('off')
   expect(store.prefs).toBeUndefined()
 
   await runSkin($, 'unpin')
-  await runSkin($, 'dracula')
+  await runSkin($, 'pernambuco')
 
   expect(store.folders).toEqual({})
-  expect((store.prefs as { skin: string }).skin).toBe('dracula')
+  expect((store.prefs as { skin: string }).skin).toBe('pernambuco')
 })
 
 // On a Team or Enterprise plan the built-in guard holds classic.SessionStart back from
@@ -1277,7 +1257,8 @@ test('the first row of a new session loads the saved prefs again, without classi
   const before = await colorNow('b1')
 
   // Saved by another session: the same session's rows leave the loaded prefs alone.
-  store.prefs = { skin: 'dracula' }
+  store.custom = { mine: { name: 'mine', label: 'Mine', base: 'pernambuco', palette: { run: '#123456' }, spinner: [], done: [] } }
+  store.prefs = { skin: 'mine' }
   await $.session.append(note)
   expect(await colorNow('b2')).toBe(before)
 
@@ -1427,83 +1408,6 @@ test('a session start says when a newer release is out, at most once a day', asy
   await unawaited()
   expect(fetches).toBe(1)
   expect(toasts.some(text => text.includes('0.1.4'))).toBe(false)
-})
-
-test('a session start waits for the design tool to be listed, so the first turn lists it', async ($, on) => {
-  const clock = stubEngine(on)
-  const order: string[] = []
-  on('session.start', () => ({ cwd: '/work' }))
-  on('command.register', () => ({ value: { command: 'skin' } }))
-  on('tool.register', async () => {
-    await clock.sleep(200)
-    order.push('listed')
-
-    return { value: { tool: 'mcp__skins__design' } }
-  })
-  on('config.list', () => ({ value: [] }))
-
-  const started = $.session.start({ surface: 'terminal', isInteractive: true, cwd: '/work' }).then(() => {
-    order.push('started')
-  })
-  await clock.settle()
-  expect(order, 'the start waits while the tool is not listed yet').toEqual([])
-  await clock.advance(200)
-  expect(order, 'the start settles as soon as the tool is listed').toEqual(['listed', 'started'])
-  await started
-})
-
-test('a session start waits at most a second for a design tool that is never listed, and still registers it', async ($, on) => {
-  const clock = stubEngine(on)
-  const registered: unknown[] = []
-  let listed = () => {}
-  let isStarted = false
-  on('session.start', () => ({ cwd: '/work' }))
-  on('command.register', () => ({ value: { command: 'skin' } }))
-  on('tool.register', ($, e) => {
-    registered.push(e)
-
-    return new Promise<{ value: { tool: string } }>(resolve => {
-      listed = () => resolve({ value: { tool: 'mcp__skins__design' } })
-    })
-  })
-  on('config.list', () => ({ value: [] }))
-
-  const started = $.session.start({ surface: 'terminal', isInteractive: true, cwd: '/work' }).then(() => {
-    isStarted = true
-  })
-  await clock.settle()
-  expect(isStarted, 'the start waits while the tool is not listed yet').toBe(false)
-  await clock.advance(1000)
-  expect(isStarted, 'a second on, the start goes on without the tool').toBe(true)
-  listed()
-  await started
-
-  expect(registered).toEqual([{ name: DESIGN_TOOL.name, description: DESIGN_TOOL.description, inputSchema: DESIGN_TOOL.inputSchema }])
-})
-
-test('a design tool that fails to register is logged to the debug log, and the rest of the start still runs', async ($, on) => {
-  const logs: { text: string; to: unknown }[] = []
-  let themeReads = 0
-  stubEngine(on, { log: true })
-  on('ui.log', ($, e) => {
-    logs.push({ text: e.text, to: e.to })
-
-    return { value: undefined }
-  })
-  on('session.start', () => ({ cwd: '/work' }))
-  on('command.register', () => ({ value: { command: 'skin' } }))
-  on('tool.register', () => ({ deny: 'refused in a test' }))
-  on('config.list', () => {
-    themeReads += 1
-
-    return { value: [] }
-  })
-
-  await $.session.start({ surface: 'terminal', isInteractive: true, cwd: '/work' })
-  await unawaited()
-
-  expect(logs.filter(log => log.text.startsWith('design tool:') && log.text.includes('refused in a test') && log.to === 'debug')).toHaveLength(1)
-  expect(themeReads, 'the theme probe after the refused registration still asks for the config').toBeGreaterThan(0)
 })
 
 test('a card settles by itself once its entrance ends, so a repaint of the stored drawing cannot replay it', async ($, on) => {
@@ -2212,7 +2116,7 @@ test('the terminal draws shell output as a card: the command and a tick, nothing
 test('a failed shell call shows its exit code, and stderr under its own label in the error colour', async ($, on) => {
   stubEngine(on)
   const [id = '', other = ''] = await ranShells($, on, ['pnpm tsc', 'pnpm lint'])
-  const palette = noir.palette
+  const palette = pernambuco.palette
 
   await closeRow($, id)
   await closeRow($, other)
@@ -2322,7 +2226,7 @@ test('/skin calm off puts back the settings it changed, and keeps changes made m
   const [look = ''] = await ranShells($, on, ['git status'])
 
   await runSkin($, 'calm on')
-  await runSkin($, 'nord')
+  await runSkin($, 'prompt right')
   await runSkin($, 'calm off')
 
   const row = await $.ui.mount(toolUse(call('Bash', { command: 'pnpm test' })))
@@ -2338,6 +2242,6 @@ test('/skin calm off puts back the settings it changed, and keeps changes made m
   await output.unmount()
 
   const listed = await runSkin($, 'list')
-  expect(JSON.stringify(listed)).toContain('● nord')
+  expect(JSON.stringify(listed)).toContain('prompt right')
   expect(JSON.stringify(listed)).toContain('calm off')
 })

@@ -1,3 +1,4 @@
+// The skin (hooks/skins.tsx).
 // Every colour a skin names. `fg` is body text, `muted` secondary text, `surface` the
 // band behind a table header, `zebra` every other table row.
 export type SkinSlot =
@@ -97,6 +98,8 @@ export type SkinsMarkdownArgs = { surface: 'terminal' | 'desktop' | 'vscode' | '
 declare module 'claude-code' {
   // What skins adds to `$` for other mods.
   interface EngineInterface {
+    // What the browser part adds to `$` (hooks/browser).
+    browser: Browser
     skins: {
       // Markdown drawn the way skins draws a reply in the person's skin: tables, code,
       // diagrams, math, alerts. Undefined when skins is off or the text holds nothing it
@@ -111,7 +114,17 @@ declare module 'claude-code' {
   }
 
   interface PluginState {
-    skins: {
+    'pe-devkit': {
+      // The task bar and the agents panel (hooks/progress).
+      progressFlow: Flow | null
+      progressAgents: AgentRun[]
+      progressPanel: Panel
+      progressNow: number
+      // The file tree (hooks/filetree).
+      filetreeTree: FileTree
+      filetreeTheme: Theme
+      filetreeActivity: Activity[]
+      // The skin (hooks/skins.tsx).
       prefs: Prefs
       custom: Record<string, CustomSkin>
       startedAt: number
@@ -140,4 +153,132 @@ declare module 'claude-code' {
       lastReply: string
     }
   }
+}
+
+// The task bar and the agents panel (hooks/progress).
+export type Phase = 'plan' | 'design' | 'delegate' | 'review' | 'close'
+
+export type PlannedTask = {
+  title: string
+  tier: string
+  after: number[]
+}
+
+export type Flow = {
+  title: string
+  total: number
+  done: number
+  running: number
+  phase: Phase
+  isFinished: boolean
+  tasks: PlannedTask[]
+}
+
+export type AgentStatus = 'running' | 'done' | 'failed'
+
+export type AgentRun = {
+  id: string
+  agentId?: string
+  type: string
+  description: string
+  model: string
+  effort?: string
+  status: AgentStatus
+  startedAt: number
+  endedAt?: number
+  contextTokens: number
+  contextMax: number
+  tokens: number
+  costUsd: number
+  steps: number
+  round: number
+  /** Self-reported by the worker through the `step` tool. */
+  stepDone?: number
+  stepTotal?: number
+  stepNote?: string
+}
+
+export type Panel = {
+  isCompact: boolean
+  isDoneCollapsed: boolean
+  autoOpenedFor: string
+}
+
+// The file tree (hooks/filetree).
+export type FileNode = {
+  id: string
+  parent: string
+  name: string
+  kind: 'dir' | 'file' | 'link'
+  hidden: boolean
+  mtime: number
+  size: number
+  loaded: boolean
+}
+
+export type Branch = {
+  head: string
+  upstream: string
+  ahead: number
+  behind: number
+}
+
+export type Activity = {
+  id: number
+  kind: string
+  label: string
+  state: 'running' | 'done' | 'failed'
+  detail: string
+  at: number
+  tone: string
+  nerd: string
+  plain: string
+}
+
+export type FileTree = {
+  root: string
+  nodes: FileNode[]
+  expanded: string[]
+  cursor: string
+  selected: string
+  query: string
+  showHidden: boolean
+  showSize: boolean
+  dirSizes: Record<string, number>
+  git: Record<string, string>
+  diff: Record<string, [number, number]>
+  ignored: string[]
+  untrackedDirs: string[]
+  top: string
+  prefix: string
+  branch: Branch | null
+  counts: Record<string, [number, number, number]>
+  flash: string[]
+  flashDim: string[]
+  flashOn: boolean
+  flashTones: Record<string, string>
+  scroll: number | null
+  preview: string
+  previewTop: number
+}
+
+export type Theme = {
+  fg: string
+  accent: string
+  muted: string
+  urgent: string
+  selection: string
+  bg: string
+}
+
+// The browser pane (hooks/browser).
+export type BrowserOpenInput = { url?: string }
+
+export type BrowserOpenResult =
+  | { ok: true; url: string }
+  | { ok: false; error: string }
+
+export type Browser = {
+  open: (input: BrowserOpenInput) => Promise<BrowserOpenResult>
+  close: (input?: Record<string, never>) => Promise<boolean>
 }

@@ -14,7 +14,7 @@ async function session($: Engine, on: On) {
 }
 
 async function band($: Engine, surface: 'terminal' | 'desktop') {
-  const ui = await $.ui.mount({ plugin: 'savvy-progress', surface, ...BAND })
+  const ui = await $.ui.mount({ plugin: 'pe-devkit', surface, ...BAND })
   const svg = await ui.findAll({ type: 'Svg' })
   const title = await ui.findAll({ type: 'Text', text: /^Ship it$/ })
   const label = await ui.findAll({ type: 'Text', text: /^Tasks 1\/4$/ })

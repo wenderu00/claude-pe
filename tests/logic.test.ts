@@ -3,7 +3,6 @@ import { expect, test } from 'claude-code/testing'
 import { DEFAULT_PREFS, parsePrefs, runSkinCommand, withCalm } from '../hooks/command'
 import { foldLines, shellResultOf, shellStatus } from '../hooks/shell'
 import { buildCustom, resolveSkin, skinNames, withSlot } from '../hooks/custom'
-import { runDesign } from '../hooks/designer'
 import { clipLines, diffstat, formatDuration, formatMs, pick, shortenPath } from '../hooks/format'
 import { columnWidths, copyOf, cutCell, padCell, splitReply, widthOf, wrapLines } from '../hooks/markdown'
 import { codeSvg, tokenize } from '../hooks/svg-code'
@@ -19,7 +18,7 @@ import { kindOf, summarize, toolLabel } from '../hooks/tools'
 import { SKINS } from '../hooks/themes'
 import { inlineRuns, splitBlocks } from '../hooks/blocks'
 import { errorLine, isQuiet, isReadOnlyShell, segmentsOf } from '../hooks/quiet'
-import tokyoNight from '../hooks/themes/tokyo-night'
+import tokyoNight from './fixtures/themes/tokyo-night'
 import { chartHeading, formatPercent, niceStep, parseMermaid, seriesName } from '../hooks/mermaid'
 import type { Architecture, Block, C4, Flow, Gantt, GitGraph, Journey, Kanban, Mindmap, Packet, Pie, Quadrant, Radar, Sankey, Timeline, Treemap, XyChart } from '../hooks/mermaid'
 import { chartSvg } from '../hooks/svg-chart'
@@ -27,7 +26,7 @@ import { mathSvg } from '../hooks/svg-math'
 import { chartArt } from '../hooks/chart-art'
 import { blockBar, dotRule } from '../hooks/chart-rows'
 import { seriesColor } from '../hooks/svg-chart-kit'
-import rosePine from '../hooks/themes/rose-pine'
+import rosePine from './fixtures/themes/rose-pine'
 
 const NAMES = ['tokyo-night', 'dracula', 'nord']
 
@@ -135,7 +134,7 @@ test('wide characters count two cells, so CJK cells are measured and cut in term
 })
 
 test('a made skin lays its slots over its base, and bad drafts are refused with a reason', async () => {
-  const sunset = buildCustom({ name: 'Sunset', base: 'gruvbox', palette: { user: '#FF8800' } }, undefined)
+  const sunset = buildCustom({ name: 'Sunset', base: 'pernambuco', palette: { user: '#FF8800' } }, undefined)
 
   expect(typeof sunset).toBe('object')
 
@@ -143,38 +142,18 @@ test('a made skin lays its slots over its base, and bad drafts are refused with 
   const skin = resolveSkin('sunset', custom)
 
   expect(skin?.palette.user).toBe('#ff8800')
-  expect(skin?.palette.run).toBe(resolveSkin('gruvbox', {})?.palette.run)
+  expect(skin?.palette.run).toBe(resolveSkin('pernambuco', {})?.palette.run)
   expect(skinNames(custom)).toContain('sunset')
-  expect(buildCustom({ name: 'dracula' }, undefined)).toContain('built-in')
+  expect(buildCustom({ name: 'pernambuco' }, undefined)).toContain('built-in')
   expect(buildCustom({ name: 'x', palette: { user: 'red' } }, undefined)).toContain('bad palette')
   expect(buildCustom({ name: 'x', base: 'nope' }, undefined)).toContain('base must be')
 })
 
 test('painting a slot on a built-in skin forks it into my-<name>', async () => {
-  const made = withSlot('nord', {}, 'user', '#123456')
+  const made = withSlot('pernambuco', {}, 'user', '#123456')
 
-  expect(typeof made === 'string' ? made : made.name).toBe('my-nord')
-  expect(withSlot('nord', {}, 'user', 'blue')).toContain('#7aa2f7')
-})
-
-test('the design tool saves, applies, changes settings and deletes', async () => {
-  const start = { prefs: DEFAULT_PREFS, custom: {} }
-  const saved = runDesign({ action: 'save', name: 'ink', base: 'mono', palette: { user: '#5555ff' } }, start)
-
-  expect(saved.isError).toBe(false)
-  expect(saved.state.prefs.skin).toBe('ink')
-
-  const quiet = runDesign({ action: 'settings', settings: { rail: false, icons: 'ascii' } }, saved.state)
-
-  expect(quiet.state.prefs.rail).toBe(false)
-  expect(quiet.state.prefs.icons).toBe('ascii')
-
-  const gone = runDesign({ action: 'delete', name: 'ink' }, quiet.state)
-
-  expect(gone.state.prefs.skin).toBe(DEFAULT_PREFS.skin)
-  expect(runDesign({ action: 'delete', name: 'nord' }, start).isError).toBe(true)
-  expect(runDesign({ action: 'apply', name: 'nope' }, start).isError).toBe(true)
-  expect(JSON.parse(runDesign({ action: 'show' }, start).text).current).toBe('noir')
+  expect(typeof made === 'string' ? made : made.name).toBe('my-pernambuco')
+  expect(withSlot('pernambuco', {}, 'user', 'blue')).toContain('#7aa2f7')
 })
 
 test('/skin names a skin, switches parts, and refuses what it does not know', async () => {
@@ -410,7 +389,6 @@ test('every built-in skin names itself once and fills every slot with a colour, 
   const hex = /^#[0-9a-f]{6}$/
   const slots = Object.keys(tokyoNight.palette)
 
-  expect(SKINS.length).toBe(15)
   expect(new Set(SKINS.map(skin => skin.name)).size).toBe(SKINS.length)
 
   for (const skin of SKINS) {

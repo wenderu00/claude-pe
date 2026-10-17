@@ -1,7 +1,7 @@
 import { expect, test } from 'claude-code/testing'
 
 import { spinnerColor, spinnerIcon, toolIcon } from '../hooks/icons'
-import dracula from '../hooks/themes/dracula'
+import dracula from './fixtures/themes/dracula'
 import type { SpinnerMode } from '../hooks/icons'
 
 // An animated icon is an image the app may draw afresh when its row redraws, which

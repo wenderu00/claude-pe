@@ -4,7 +4,7 @@ import { commandSegments } from '../hooks/command-output'
 import { splitReply } from '../hooks/markdown'
 import { inlineMath, linear, mathArt, parseTex } from '../hooks/math'
 import { mathSvg } from '../hooks/svg-math'
-import tokyoNight from '../hooks/themes/tokyo-night'
+import tokyoNight from './fixtures/themes/tokyo-night'
 
 const line = (tex: string): string => linear(parseTex(tex))
 

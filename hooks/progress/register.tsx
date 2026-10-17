@@ -1,16 +1,17 @@
 import { atom, read, update } from 'claude-code'
-import type { EngineInterface, Register } from 'claude-code'
+import type { EngineInterface, On, PluginOptions } from 'claude-code'
+import type { AbovePromptEvent, AbovePromptNext, AbovePromptResult, PartEvent, PartNext, PartResult } from '../parts'
 
-import type { AgentRun, Flow, Panel, Phase, PlannedTask } from '../types'
+import type { AgentRun, Flow, Panel, Phase, PlannedTask } from '../../types'
 
-const flow = atom({ plugin: 'savvy-progress', key: 'flow' } as const, null)
-const agents = atom({ plugin: 'savvy-progress', key: 'agents' } as const, [])
-const panel = atom({ plugin: 'savvy-progress', key: 'panel' } as const, {
+const flow = atom({ plugin: 'pe-devkit', key: 'progressFlow' } as const, null)
+const agents = atom({ plugin: 'pe-devkit', key: 'progressAgents' } as const, [])
+const panel = atom({ plugin: 'pe-devkit', key: 'progressPanel' } as const, {
   isCompact: false,
   isDoneCollapsed: false,
   autoOpenedFor: '',
 })
-const now = atom({ plugin: 'savvy-progress', key: 'now' } as const, 0)
+const now = atom({ plugin: 'pe-devkit', key: 'progressNow' } as const, 0)
 
 const TOOL = 'mcp__savvy-progress__progress'
 const STEP_TOOL = 'mcp__savvy-progress__step'
@@ -790,77 +791,180 @@ async function autoOpen($: EngineInterface, key: string): Promise<void> {
   void $.ui.open({ id: PANE, title: tr().pane })
 }
 
-export const register: Register = (on, options) => {
-  on('session.start', async ($, e, next) => {
-    const started = await next(e)
-    lang = await detectLang($, options.language)
-    await $.tool.register({
-      name: 'progress',
-      description:
-        'Report /savvy-flow progress to the progress bar above the prompt and the agents panel. ' +
-        'Call it after presenting the plan (title, total, tasks, phase "delegate"), each time a task is accepted (done), ' +
-        'when switching phase or re-planning (tasks), and once at the end with finished: true. Fields left out keep their previous value. ' +
-        'For the main session only: a call from a subagent is ignored (workers report with `step`).',
-      inputSchema: {
-        type: 'object',
-        properties: {
-          title: { type: 'string', description: 'Short name of the overall task, a few words.' },
-          total: { type: 'integer', minimum: 0, description: 'Number of planned worker tasks.' },
-          done: { type: 'integer', minimum: 0, description: 'Number of tasks accepted after review.' },
-          phase: { type: 'string', enum: [...PHASES] },
-          finished: { type: 'boolean', description: 'True once the flow is closed.' },
-          tasks: {
-            type: 'array',
-            description:
-              'The planned worker tasks in order, numbered from 1. Each title must equal the Agent tool `description` the task will be delegated with, so the panel can match runs to tasks.',
-            items: {
-              type: 'object',
-              properties: {
-                title: { type: 'string', description: 'A few words; reused verbatim as the Agent description.' },
-                tier: { type: 'string', enum: [...TIERS] },
-                after: { type: 'array', items: { type: 'integer' }, description: 'Numbers of the tasks this one waits for.' },
-              },
-              required: ['title', 'tier'],
+// userConfig.language, read by the session.start hook.
+let languageSetting: unknown
+
+export async function progressSessionStart($: EngineInterface, e: PartEvent<'session.start'>, next: PartNext<'session.start'>): PartResult<'session.start'> {
+  const started = await next(e)
+  lang = await detectLang($, languageSetting)
+  await $.tool.register({
+    name: 'progress',
+    description:
+      'Report /savvy-flow progress to the progress bar above the prompt and the agents panel. ' +
+      'Call it after presenting the plan (title, total, tasks, phase "delegate"), each time a task is accepted (done), ' +
+      'when switching phase or re-planning (tasks), and once at the end with finished: true. Fields left out keep their previous value. ' +
+      'For the main session only: a call from a subagent is ignored (workers report with `step`).',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        title: { type: 'string', description: 'Short name of the overall task, a few words.' },
+        total: { type: 'integer', minimum: 0, description: 'Number of planned worker tasks.' },
+        done: { type: 'integer', minimum: 0, description: 'Number of tasks accepted after review.' },
+        phase: { type: 'string', enum: [...PHASES] },
+        finished: { type: 'boolean', description: 'True once the flow is closed.' },
+        tasks: {
+          type: 'array',
+          description:
+            'The planned worker tasks in order, numbered from 1. Each title must equal the Agent tool `description` the task will be delegated with, so the panel can match runs to tasks.',
+          items: {
+            type: 'object',
+            properties: {
+              title: { type: 'string', description: 'A few words; reused verbatim as the Agent description.' },
+              tier: { type: 'string', enum: [...TIERS] },
+              after: { type: 'array', items: { type: 'integer' }, description: 'Numbers of the tasks this one waits for.' },
             },
+            required: ['title', 'tier'],
           },
         },
       },
-    })
-    await $.tool.register({
-      name: 'step',
-      description:
-        'For savvy-flow workers: report progress on your own task to the agents panel. ' +
-        'Right after reading the brief, call it with `total` (your plan in 3-8 steps) and `done: 0`; ' +
-        'call it again as each step finishes. Cheap and silent: it only draws a bar.',
-      inputSchema: {
-        type: 'object',
-        properties: {
-          done: { type: 'integer', minimum: 0, description: 'Steps finished so far.' },
-          total: { type: 'integer', minimum: 1, description: 'Steps planned; may change if the plan changes.' },
-          note: { type: 'string', description: 'The step in progress, a few words.' },
-        },
-        required: ['done'],
+    },
+  })
+  await $.tool.register({
+    name: 'step',
+    description:
+      'For savvy-flow workers: report progress on your own task to the agents panel. ' +
+      'Right after reading the brief, call it with `total` (your plan in 3-8 steps) and `done: 0`; ' +
+      'call it again as each step finishes. Cheap and silent: it only draws a bar.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        done: { type: 'integer', minimum: 0, description: 'Steps finished so far.' },
+        total: { type: 'integer', minimum: 1, description: 'Steps planned; may change if the plan changes.' },
+        note: { type: 'string', description: 'The step in progress, a few words.' },
       },
-      // In every agent's tool list, not behind ToolSearch: workers do not go looking for it.
-      isDeferred: false,
-    })
-    await $.command.register({
-      name: 'agents-info',
-      description: 'Show or hide the panel of subagents: running, finished and planned, with model, context, cost and time',
-    })
-
-    // Ticks the running agents' clocks; quiet when nothing runs.
-    $.clock.every(1000, () => {
-      void (async () => {
-        const list = await read($, agents)
-        if (!list.some(a => a.status === 'running')) return
-        const at = await $.clock.now()
-        await update($, now, () => at)
-      })()
-    })
-    return started
+      required: ['done'],
+    },
+    // In every agent's tool list, not behind ToolSearch: workers do not go looking for it.
+    isDeferred: false,
+  })
+  await $.command.register({
+    name: 'agents-info',
+    description: 'Show or hide the panel of subagents: running, finished and planned, with model, context, cost and time',
   })
 
+  // Ticks the running agents' clocks; quiet when nothing runs.
+  $.clock.every(1000, () => {
+    void (async () => {
+      const list = await read($, agents)
+      if (!list.some(a => a.status === 'running')) return
+      const at = await $.clock.now()
+      await update($, now, () => at)
+    })()
+  })
+  return started
+}
+
+export async function progressTurnComplete($: EngineInterface, e: PartEvent<'turn.complete'>, next: PartNext<'turn.complete'>): PartResult<'turn.complete'> {
+  const agentId = e.agentId
+  if (agentId) {
+    const at = await $.clock.now()
+    await update($, agents, list =>
+      list.map((a): AgentRun => {
+        if (a.agentId !== agentId) return a
+        // A run whose steps went unseen still gets the turn's own sum.
+        const fallback = a.steps === 0 && e.usage
+        return {
+          ...a,
+          status: e.reason === 'answer' ? 'done' : 'failed',
+          endedAt: at,
+          ...(fallback && e.usage
+            ? {
+                model: e.usage.model || a.model,
+                tokens:
+                  e.usage.input_tokens +
+                  e.usage.output_tokens +
+                  e.usage.cache_read_input_tokens +
+                  e.usage.cache_creation_input_tokens,
+                costUsd: costOf(e.usage.model || a.model, e.usage, false),
+              }
+            : {}),
+        }
+      }),
+    )
+    await update($, now, () => at)
+  }
+  return next(e)
+}
+
+export async function progressAbovePrompt($: EngineInterface, e: AbovePromptEvent, next: AbovePromptNext): AbovePromptResult {
+  const f = await read($, flow)
+  if (f === null || e.props.hasSurvey) return next(e)
+  // Draw this row with the other mods' bands beneath it. Claude Code's own placeholder ({ type: 'engine' }) is
+  // never nested: the desktop drops a band that nests it.
+  const drawn = await Promise.resolve(next(e)).catch(() => null)
+  const below = drawn && typeof drawn === 'object' && (drawn as { type?: string }).type !== 'engine' ? drawn : null
+
+  const ui = $.ui.resolve(e)
+  const { Box, Text, Button } = ui
+  const list = await read($, agents)
+  const crew = list.length + plannedOf(f, list).length
+  const isWorking = list.some(a => a.status === 'running')
+  const crewButton = (
+    <Button key="savvy-agents" label={`×${crew}`} plain onPress={() => void togglePane($)} />
+  )
+  const percent = `${Math.round(ratio(f) * 100)}%`
+  const dismiss = (
+    <Button
+      key="savvy-dismiss"
+      label="✕"
+      plain
+      role="dismiss"
+      onPress={() => update($, flow, () => null)}
+    />
+  )
+
+  // The terminal's element table is completed with an `Svg` that draws nothing: test the surface too.
+  if (e.surface !== 'terminal' && 'Svg' in ui) {
+    const { Svg } = ui
+    // About 8 CSS px per reported column; the rest is the count, the dismiss
+    // and their gaps. No floor above the slot: a row wider than it would wrap.
+    const width = Math.max(180, Math.min(1600, (e.props.bodyColumns || 100) * 8 - 96))
+    return (
+      <Box flexDirection="column">
+        <Box flexDirection={isRtl() ? 'row-reverse' : 'row'} alignItems="center" gap={1}>
+          <Svg source={rowSvg(f, width, isWorking)} alt={`${f.title}: ${label(f)}, ${percent}`} width={width} height={H} />
+          {crewButton}
+          {dismiss}
+        </Box>
+        {below}
+      </Box>
+    )
+  }
+
+  const cols = e.props.bodyColumns
+  const titleW = Math.max(8, Math.min(30, f.title.length + 2, Math.floor(cols / 3)))
+  const width = Math.max(6, Math.min(40, cols - titleW - 32))
+  return (
+    <Box flexDirection="column">
+      <Box flexDirection="row" gap={2}>
+        <Box width={titleW} flexShrink={0}>
+          <Text color={f.isFinished ? DONE : ACCENT}>● </Text>
+          <Text wrap="truncate-end">{f.title}</Text>
+        </Box>
+        <Text color={f.isFinished ? DONE : ACCENT}>{barText(f, width)}</Text>
+        <Text bold>{label(f)}</Text>
+        <Text dimColor>{percent}</Text>
+        <Text color={CLAY}>▣</Text>
+        {crewButton}
+        {dismiss}
+      </Box>
+      {below}
+    </Box>
+  )
+}
+
+export const register = (on: On, options: PluginOptions): void => {
+  languageSetting = options.language
   on('command.run', { command: 'agents-info' }, async ($, e) => {
     // `/agents-info open` opens the panel, or brings it forward from behind another tab, without toggling it.
     if ((e.args ?? '').trim() === 'open') {
@@ -951,7 +1055,7 @@ export const register: Register = (on, options) => {
     if (e.subagentType.startsWith('savvy-')) {
       const f = await read($, flow)
       await autoOpen($, f && !f.isFinished ? f.title : 'savvy-flow')
-    } else if (options.autoOpen === 'any') {
+    } else if (options.autoOpen === 'subagente') {
       await autoOpen($, 'any-agent')
     }
     return started
@@ -993,38 +1097,6 @@ export const register: Register = (on, options) => {
       ),
     )
     return result
-  })
-
-  on('turn.complete', async ($, e, next) => {
-    const agentId = e.agentId
-    if (agentId) {
-      const at = await $.clock.now()
-      await update($, agents, list =>
-        list.map((a): AgentRun => {
-          if (a.agentId !== agentId) return a
-          // A run whose steps went unseen still gets the turn's own sum.
-          const fallback = a.steps === 0 && e.usage
-          return {
-            ...a,
-            status: e.reason === 'answer' ? 'done' : 'failed',
-            endedAt: at,
-            ...(fallback && e.usage
-              ? {
-                  model: e.usage.model || a.model,
-                  tokens:
-                    e.usage.input_tokens +
-                    e.usage.output_tokens +
-                    e.usage.cache_read_input_tokens +
-                    e.usage.cache_creation_input_tokens,
-                  costUsd: costOf(e.usage.model || a.model, e.usage, false),
-                }
-              : {}),
-          }
-        }),
-      )
-      await update($, now, () => at)
-    }
-    return next(e)
   })
 
   on('ui.render', { component: 'Pane', requestId: PANE }, async ($, e) => {
@@ -1202,70 +1274,4 @@ export const register: Register = (on, options) => {
     )
   })
 
-  on('ui.render', { component: 'AbovePrompt' }, async ($, e, next) => {
-    const f = await read($, flow)
-    if (f === null || e.props.hasSurvey) return next(e)
-    // Draw this row with the other mods' bands beneath it. Claude Code's own placeholder ({ type: 'engine' }) is
-    // never nested: the desktop drops a band that nests it.
-    const drawn = await Promise.resolve(next(e)).catch(() => null)
-    const below = drawn && typeof drawn === 'object' && (drawn as { type?: string }).type !== 'engine' ? drawn : null
-
-    const ui = $.ui.resolve(e)
-    const { Box, Text, Button } = ui
-    const list = await read($, agents)
-    const crew = list.length + plannedOf(f, list).length
-    const isWorking = list.some(a => a.status === 'running')
-    const crewButton = (
-      <Button key="savvy-agents" label={`×${crew}`} plain onPress={() => void togglePane($)} />
-    )
-    const percent = `${Math.round(ratio(f) * 100)}%`
-    const dismiss = (
-      <Button
-        key="savvy-dismiss"
-        label="✕"
-        plain
-        role="dismiss"
-        onPress={() => update($, flow, () => null)}
-      />
-    )
-
-    // The terminal's element table is completed with an `Svg` that draws nothing: test the surface too.
-    if (e.surface !== 'terminal' && 'Svg' in ui) {
-      const { Svg } = ui
-      // About 8 CSS px per reported column; the rest is the count, the dismiss
-      // and their gaps. No floor above the slot: a row wider than it would wrap.
-      const width = Math.max(180, Math.min(1600, (e.props.bodyColumns || 100) * 8 - 96))
-      return (
-        <Box flexDirection="column">
-          <Box flexDirection={isRtl() ? 'row-reverse' : 'row'} alignItems="center" gap={1}>
-            <Svg source={rowSvg(f, width, isWorking)} alt={`${f.title}: ${label(f)}, ${percent}`} width={width} height={H} />
-            {crewButton}
-            {dismiss}
-          </Box>
-          {below}
-        </Box>
-      )
-    }
-
-    const cols = e.props.bodyColumns
-    const titleW = Math.max(8, Math.min(30, f.title.length + 2, Math.floor(cols / 3)))
-    const width = Math.max(6, Math.min(40, cols - titleW - 32))
-    return (
-      <Box flexDirection="column">
-        <Box flexDirection="row" gap={2}>
-          <Box width={titleW} flexShrink={0}>
-            <Text color={f.isFinished ? DONE : ACCENT}>● </Text>
-            <Text wrap="truncate-end">{f.title}</Text>
-          </Box>
-          <Text color={f.isFinished ? DONE : ACCENT}>{barText(f, width)}</Text>
-          <Text bold>{label(f)}</Text>
-          <Text dimColor>{percent}</Text>
-          <Text color={CLAY}>▣</Text>
-          {crewButton}
-          {dismiss}
-        </Box>
-        {below}
-      </Box>
-    )
-  })
 }

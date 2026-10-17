@@ -1,5 +1,5 @@
 {
-  "name": "claude-pe",
+  "name": "pe-devkit",
   "version": "0.1.0",
   "description": "Não oficial. Claude Code com a identidade visual do Governo de Pernambuco (Liga Digital) e ajuda para construir front-end com @uigovpe/components.",
   "author": { "name": "Márcio Wendell", "url": "https://github.com/wenderu00" },

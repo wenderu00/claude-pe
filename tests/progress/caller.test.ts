@@ -1,6 +1,6 @@
 import { expect, test } from 'claude-code/testing'
 
-const PLUGIN = 'savvy-progress'
+const PLUGIN = 'pe-devkit'
 const PROGRESS = 'mcp__savvy-progress__progress'
 const band = { hasSurvey: false, isWorking: false, maxRows: 4, bodyColumns: 100, scroll: { offset: 0, bodyRows: 4 }, view: {} }
 

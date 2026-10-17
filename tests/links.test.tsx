@@ -4,12 +4,12 @@ import type { Engine } from 'claude-code/testing'
 
 import { inlineRuns } from '../hooks/blocks'
 import { hyperlinksFrom, safeHref, touchOf } from '../hooks/links'
+import pernambuco from '../hooks/themes/pernambuco'
 import { tableArt } from '../hooks/markdown'
-import noir from '../hooks/themes/noir'
 
 // Links, this turn's files, copy controls and folding.
 
-const SITE = { plugin: 'skins', viewport: { columns: 100, rows: 30 } } as const
+const SITE = { plugin: 'pe-devkit', viewport: { columns: 100, rows: 30 } } as const
 const STOCK: RenderElement = { type: 'Text', props: {}, children: ['stock row'] }
 
 function stub(on: On, env: Record<string, string> = {}, copied: string[] = []) {
@@ -141,19 +141,19 @@ test('files this turn created or edited take their colour in rows and prose, unt
 
   const prose = await $.ui.mount(reply('Made src/new.ts and changed src/old.ts:4, left src/other.ts alone.'))
   const line = await prose.find({ type: 'Text', text: /Made/ })
-  expect(colorOf(line, 'src/new.ts')).toBe(noir.palette.ok)
-  expect(colorOf(line, 'src/old.ts:4')).toBe(noir.palette.warn)
-  expect(colorOf(line, 'src/other.ts')).toBe(noir.palette.read)
+  expect(colorOf(line, 'src/new.ts')).toBe(pernambuco.palette.ok)
+  expect(colorOf(line, 'src/old.ts:4')).toBe(pernambuco.palette.warn)
+  expect(colorOf(line, 'src/other.ts')).toBe(pernambuco.palette.read)
   await prose.unmount()
 
   const call = { tool_use_id: 'tu9', tool: 'Read', input: { file_path: '/work/src/old.ts' }, isRunning: false, isErrored: false, isInterrupted: false }
   const row = await $.ui.mount({ ...SITE, surface: 'terminal', component: 'ToolUse', requestId: 'tu9', props: call })
-  expect(colorOf(await row.find({ type: 'Text', text: /Read/ }), '  src/old.ts')).toBe(noir.palette.warn)
+  expect(colorOf(await row.find({ type: 'Text', text: /Read/ }), '  src/old.ts')).toBe(pernambuco.palette.warn)
   await row.unmount()
 
   await $.turn.start({ text: 'again', turnId: 't2' } as never)
   const fresh = await $.ui.mount(reply('Made src/new.ts and changed src/old.ts:4.', 'terminal', 'm2'))
-  expect(colorOf(await fresh.find({ type: 'Text', text: /Made/ }), 'src/new.ts')).toBe(noir.palette.read)
+  expect(colorOf(await fresh.find({ type: 'Text', text: /Made/ }), 'src/new.ts')).toBe(pernambuco.palette.read)
 })
 
 const TABLE = '| Skin | Accent |\n|---|---|\n| noir | white |\n| nord | frost |'

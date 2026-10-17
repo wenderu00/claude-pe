@@ -1,6 +1,7 @@
 /* @jsx h */
-import type { EngineInterface, Register } from 'claude-code'
-import type { Browser } from './browser'
+import type { EngineInterface, On, PluginOptions } from 'claude-code'
+import type { AbovePromptEvent, AbovePromptNext, AbovePromptResult, PartEvent, PartNext, PartResult } from '../parts'
+import type { Browser } from '../../types'
 import { MAX_IMAGE_CELLS } from './surface.tsx'
 import { normalizeUrl } from './urls.ts'
 import {
@@ -18,8 +19,8 @@ import {
 const PANE = 'browser'
 const IMAGE_KEY = 'view'
 const IMAGE_ALT = ''
-const OPEN_TOOL = 'mcp__terminal-browser__open'
-const CLOSE_TOOL = 'mcp__terminal-browser__close'
+const OPEN_TOOL = 'mcp__pe-devkit__browser_open'
+const CLOSE_TOOL = 'mcp__pe-devkit__browser_close'
 const START_URL = 'terminal-browser://start'
 const INSTALL_URL = 'https://terminal-browser.sh'
 const REQUIRED_CAPABILITIES = ['embedding', 'image-frames']
@@ -247,16 +248,52 @@ async function deliverAgentText($: EngineInterface): Promise<void> {
 }
 
 
-export const register: Register = (on, options) => {
-  const agentToolEnabled = options.agentTool === true
+// userConfig.agentTool: whether the model gets the open and close tools.
+let agentToolEnabled = false
 
-// this is a hack because the plugin api does not allow $ or the result of next to be passed to functions
-  on('engine.create', async ($, e, next) => {
-    const built = await next(e)
-    const servedByHooks = () => { throw new Error('the browser noun is served by its hooks') }
-    const browser: Browser = { open: servedByHooks, close: servedByHooks }
-    return { ...built, browser }
-  })
+export async function browserSessionStart($: EngineInterface, e: PartEvent<'session.start'>, next: PartNext<'session.start'>): PartResult<'session.start'> {
+  const r = await next(e)
+  let surfaces: readonly string[] = []
+  try {
+    surfaces = await $.session.surfaces()
+  } catch {}
+  if (!surfaces.includes('terminal')) return r
+  await $.command.register({
+    name: 'browser',
+    description: 'Open a browser to the right',
+    argumentHint: '[url]',
+    immediate: true,
+  }).catch(err => $.ui.log(`terminal-browser: /browser not registered: ${err}`))
+  if (agentToolEnabled) {
+    await $.tool.register({
+      name: 'browser_open',
+      description: 'Open terminal-browser directly inside claude code. Control the open page with the terminal-browser action CLI.',
+      inputSchema: { type: 'object', properties: { url: { type: 'string', description: 'The page to open, as a full url or a host name' } } },
+    }).catch(err => $.ui.log(`terminal-browser: open tool not registered: ${err}`))
+    await $.tool.register({ name: 'browser_close', description: 'Close the terminal-browser pane.' }).catch(err => $.ui.log(`terminal-browser: close tool not registered: ${err}`))
+  }
+  return r
+}
+
+export async function browserUiMessage($: EngineInterface, e: PartEvent<'ui.message'>, next: PartNext<'ui.message'>): PartResult<'ui.message'> {
+  if (e.requestId !== PANE || state.port === null) return next(e)
+  if (isSizeMessage(e.data)) {
+    state.region = { cols: e.data.cols, rows: e.data.rows }
+    if (state.pendingUrl) {
+      const url = state.pendingUrl
+      state.pendingUrl = null
+      await post($, '/open', { url, ...state.region })
+    } else {
+      await post($, '/size', state.region)
+    }
+  } else if (isInputMessage(e.data)) {
+    await post($, '/input', { events: e.data.events })
+  }
+  return next(e)
+}
+
+export const register = (on: On, options: PluginOptions): void => {
+  agentToolEnabled = options.agentTool === true
 
   on('browser.open', async ($, e) => {
     const opened = await openBrowser($, e.url ?? null)
@@ -265,30 +302,6 @@ export const register: Register = (on, options) => {
 
   on('browser.close', async ($) => {
     return { value: await closeBrowser($) }
-  })
-
-  on('session.start', async ($, e, next) => {
-    const r = await next(e)
-    let surfaces: readonly string[] = []
-    try {
-      surfaces = await $.session.surfaces()
-    } catch {}
-    if (!surfaces.includes('terminal')) return r
-    await $.command.register({
-      name: 'browser',
-      description: 'Open a browser to the right',
-      argumentHint: '[url]',
-      immediate: true,
-    }).catch(err => $.ui.log(`terminal-browser: /browser not registered: ${err}`))
-    if (agentToolEnabled) {
-      await $.tool.register({
-        name: 'open',
-        description: 'Open terminal-browser directly inside claude code. Control the open page with the terminal-browser action CLI.',
-        inputSchema: { type: 'object', properties: { url: { type: 'string', description: 'The page to open, as a full url or a host name' } } },
-      }).catch(err => $.ui.log(`terminal-browser: open tool not registered: ${err}`))
-      await $.tool.register({ name: 'close', description: 'Close the terminal-browser pane.' }).catch(err => $.ui.log(`terminal-browser: close tool not registered: ${err}`))
-    }
-    return r
   })
 
   on('command.run', { command: 'browser' }, async ($, e) => {
@@ -334,23 +347,6 @@ export const register: Register = (on, options) => {
         </Box>
       </Box>
     )
-  })
-
-  on('ui.message', async ($, e, next) => {
-    if (e.requestId !== PANE || state.port === null) return next(e)
-    if (isSizeMessage(e.data)) {
-      state.region = { cols: e.data.cols, rows: e.data.rows }
-      if (state.pendingUrl) {
-        const url = state.pendingUrl
-        state.pendingUrl = null
-        await post($, '/open', { url, ...state.region })
-      } else {
-        await post($, '/size', state.region)
-      }
-    } else if (isInputMessage(e.data)) {
-      await post($, '/input', { events: e.data.events })
-    }
-    return next(e)
   })
 
   on('ui.scroll', { requestId: PANE }, async ($, e) => {

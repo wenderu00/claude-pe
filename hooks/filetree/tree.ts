@@ -1,4 +1,4 @@
-import type { Branch, FileNode, FileTree, Theme } from '../types'
+import type { Branch, FileNode, FileTree, Theme } from '../../types'
 import { stronger } from './icons'
 
 export type Entry = { name: string; kind: 'file' | 'dir' | 'other'; mtimeMs: number; size: number; isLink: boolean }

@@ -1,5 +1,5 @@
 import { expect, test } from 'claude-code/testing'
-import { openCommand, openWithCommand, tmuxOpenCommand, TMUX_OPEN } from '../hooks/open'
+import { openCommand, openWithCommand, tmuxOpenCommand, TMUX_OPEN } from '../../hooks/filetree/open'
 
 test('inside tmux, open hands the file to the tmux opener with the editor and its folder', () => {
   const { argv } = tmuxOpenCommand('nvim', '/work/A & B/dax.ts')

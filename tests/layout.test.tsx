@@ -4,9 +4,8 @@ import type { Engine } from 'claude-code/testing'
 
 import { diffFenceTag, fenceDiff, newOnly } from '../hooks/diff-fence'
 import { DEFAULT_PREFS } from '../hooks/command'
+import pernambuco from '../hooks/themes/pernambuco'
 import { replySegments } from '../hooks/reply'
-import dracula from '../hooks/themes/dracula'
-import noir from '../hooks/themes/noir'
 
 // Diff fences, blocks side by side, and `$.skins.markdown` for other mods.
 
@@ -32,7 +31,7 @@ const skin = ($: Engine, args: string) =>
   $.command.run({ command: 'skin', args, origin: { kind: 'composer' }, presentation: { isFullscreen: false, columns: 100 } })
 
 const reply = (text: string, surface: 'terminal' | 'desktop' = 'terminal', columns = 100, requestId = 'm1') =>
-  ({ plugin: 'skins', viewport: { columns, rows: 30 }, surface, component: 'AssistantMessage', requestId, props: { text, isFirstOfReply: true } }) as const
+  ({ plugin: 'pe-devkit', viewport: { columns, rows: 30 }, surface, component: 'AssistantMessage', requestId, props: { text, isFirstOfReply: true } }) as const
 
 type Node = { type?: string; props: Record<string, unknown>; children?: readonly unknown[] }
 
@@ -58,7 +57,7 @@ test('a diff fence on the terminal is numbered rows in the skin’s colours, wit
   const ui = await $.ui.mount(reply(DIFF))
   const added = (await ui.find({ type: 'Text', text: /11 \+ {3}return n <= 10/ })) as Node | undefined
   expect(added).toBeDefined()
-  expect(JSON.stringify(added)).toContain(noir.palette.ok)
+  expect(JSON.stringify(added)).toContain(pernambuco.palette.ok)
   expect(await ui.find({ type: 'Text', text: /11 {4}- {3}return n < 10/ })).toBeDefined()
   expect(await ui.find({ type: 'Text', text: /src\/limit\.ts/ })).toBeDefined()
 
@@ -106,10 +105,10 @@ async function token(ui: { findAll: (q: { type: string }) => Promise<unknown[]> 
 
 test('a diff fence highlights its code in the language its path names, the markers in the change colours', async ($, on) => {
   stub(on)
-  await skin($, 'dracula')
+  await skin($, 'pernambuco')
 
   const ui = await $.ui.mount(reply(FS_DIFF))
-  expect((await token(ui, 'match'))?.props.color).toBe(dracula.palette.web)
+  expect((await token(ui, 'match'))?.props.color).toBe(pernambuco.palette.web)
   expect((await token(ui, 'if'))?.props.dimColor).toBe(true)
   expect(await ui.find({ type: 'Text', text: /2 \+ {5}match bar with/ })).toBeDefined()
 })
@@ -123,10 +122,10 @@ test('a ```diff-<language> fence names its language, as Prism reads it', async (
   expect(diffFenceTag('fsharp')).toBeNull()
 
   stub(on)
-  await skin($, 'dracula')
+  await skin($, 'pernambuco')
 
   const ui = await $.ui.mount(reply('```diff-fsharp\n-let a = 1\n+let a = 2\n```'))
-  expect((await token(ui, 'let'))?.props.color).toBe(dracula.palette.web)
+  expect((await token(ui, 'let'))?.props.color).toBe(pernambuco.palette.web)
   expect(await ui.find({ type: 'Text', text: /1 {3}- let a = 1/ })).toBeDefined()
 })
 

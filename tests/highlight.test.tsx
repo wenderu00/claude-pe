@@ -3,9 +3,8 @@ import { expect, mock, test } from 'claude-code/testing'
 import type { Engine } from 'claude-code/testing'
 
 import { highlight, languageOf, outputTokens } from '../hooks/highlight'
+import pernambuco from '../hooks/themes/pernambuco'
 import type { Role } from '../hooks/highlight'
-import noir from '../hooks/themes/noir'
-import dracula from '../hooks/themes/dracula'
 
 // The terminal's highlighting: each language family, shell output, and the toggle.
 
@@ -153,7 +152,7 @@ test('shell output picks out failures, warnings, passes, paths and numbers', () 
   expect(roles('C:\\Users\\me\\a.ps1')).toEqual({ 'C:\\Users\\me\\a.ps1': 'property' })
 })
 
-const SITE = { plugin: 'skins', viewport: { columns: 100, rows: 30 } } as const
+const SITE = { plugin: 'pe-devkit', viewport: { columns: 100, rows: 30 } } as const
 const STOCK: RenderElement = { type: 'Text', props: {}, children: ['stock row'] }
 
 function stub(on: On) {
@@ -194,15 +193,15 @@ function colorOf(node: unknown, text: string): string | undefined {
 
 test('a fence on the terminal is drawn in the skin\u2019s colours, its language on the frame', async ($, on) => {
   stub(on)
-  await skin($, 'dracula')
+  await skin($, 'pernambuco')
   const text = 'Try:\n\n```python\ndef go():\n    return 1  # one\n```'
   const ui = await $.ui.mount({ ...SITE, surface: 'terminal', component: 'AssistantMessage', requestId: 'h1', props: { text, isFirstOfReply: true } })
 
   expect(await ui.find({ type: 'Text', text: ' python ' })).toBeDefined()
   const line = await ui.find({ type: 'Text', text: '    return 1  # one' })
-  expect(colorOf(line, 'return')).toBe(dracula.palette.web)
-  expect(colorOf(line, '1')).toBe(dracula.palette.search)
-  expect(colorOf(line, '# one')).toBe(dracula.palette.muted)
+  expect(colorOf(line, 'return')).toBe(pernambuco.palette.web)
+  expect(colorOf(line, '1')).toBe(pernambuco.palette.search)
+  expect(colorOf(line, '# one')).toBe(pernambuco.palette.muted)
   expect(await ui.find({ key: 'copy-1' })).toBeDefined()
 })
 
@@ -221,17 +220,17 @@ test('shell output is coloured in both cards, and plain with highlight off', asy
 
   const terminal = await $.ui.mount(result('terminal', 'o1'))
   const line = await terminal.find({ type: 'Text', text: 'src/a.ts:3 error in 12ms' })
-  expect(colorOf(line, 'error')).toBe(noir.palette.err)
+  expect(colorOf(line, 'error')).toBe(pernambuco.palette.err)
   await terminal.unmount()
 
   const desktop = await $.ui.mount(result('desktop', 'o2'))
   const source = ((await desktop.find({ type: 'Svg' })) as { props: { source: string } } | undefined)?.props.source ?? ''
-  expect(source).toContain(`<tspan style="fill:${noir.palette.err}">error</tspan>`)
+  expect(source).toContain(`<tspan style="fill:${pernambuco.palette.err}">error</tspan>`)
   await desktop.unmount()
 
   await skin($, 'highlight off')
   const plain = await $.ui.mount(result('terminal', 'o3'))
-  expect(colorOf(await plain.find({ type: 'Text', text: 'src/a.ts:3 error in 12ms' }), 'src/a.ts:3 error in 12ms')).toBe(noir.palette.fg)
+  expect(colorOf(await plain.find({ type: 'Text', text: 'src/a.ts:3 error in 12ms' }), 'src/a.ts:3 error in 12ms')).toBe(pernambuco.palette.fg)
   const flat = await $.ui.mount(result('desktop', 'o4'))
   expect(((await flat.find({ type: 'Svg' })) as { props: { source: string } } | undefined)?.props.source).not.toContain('<tspan')
 })

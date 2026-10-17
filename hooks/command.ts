@@ -1,7 +1,7 @@
 import type { CalmSnapshot, Prefs } from '../types'
 
 export const DEFAULT_PREFS: Prefs = {
-  skin: 'noir',
+  skin: 'pernambuco',
   icons: 'unicode',
   prompt: 'left',
   words: 'skin',
