@@ -1,0 +1,80 @@
+{
+  "name": "claude-pe",
+  "version": "0.1.0",
+  "description": "Não oficial. Claude Code com a identidade visual do Governo de Pernambuco (Liga Digital) e ajuda para construir front-end com @uigovpe/components.",
+  "author": { "name": "Márcio Wendell", "url": "https://github.com/wenderu00" },
+  "homepage": "https://github.com/wenderu00/claude-pe",
+  "repository": "https://github.com/wenderu00/claude-pe",
+  "license": "MIT",
+  "keywords": ["claude-code-mods", "function-hooks", "pernambuco", "design-system", "liga-digital"],
+  "types": "./types/index.d.ts",
+  "userConfig": {
+    "autoOpen": {
+      "type": "string",
+      "title": "Painel de agentes",
+      "description": "subagente: o painel abre quando um subagente começa. manual: só abre com /agents-info.",
+      "default": "subagente",
+      "options": ["subagente", "manual"]
+    },
+    "activity": {
+      "type": "string",
+      "title": "Atividade do Claude na árvore",
+      "description": "Quais ações do Claude brilham na árvore de arquivos: leituras, escritas e ações de git.",
+      "default": "leituras e escritas",
+      "options": ["leituras e escritas", "escritas", "leituras", "nenhuma"]
+    },
+    "glyphs": {
+      "type": "string",
+      "title": "Ícones da árvore",
+      "description": "auto: ícones Nerd Font quando há uma instalada, exceto no app desktop. simples: só Unicode.",
+      "default": "auto",
+      "options": ["auto", "nerd", "simples"]
+    },
+    "follow": {
+      "type": "string",
+      "title": "Seguir o Claude",
+      "description": "sim: a árvore rola até o que o Claude lê, escreve ou faz commit. não: a vista só muda quando você rola.",
+      "default": "sim",
+      "options": ["sim", "não"]
+    },
+    "start": {
+      "type": "string",
+      "title": "Abrir a árvore no início",
+      "description": "sim: a árvore abre quando a sessão começa. não: só abre com /filetree.",
+      "default": "sim",
+      "options": ["sim", "não"]
+    },
+    "column": {
+      "type": "string",
+      "title": "Coluna da direita",
+      "description": "data: última modificação. idade: tempo desde a última modificação. tamanho: bytes dos arquivos e uso de disco das pastas.",
+      "default": "data",
+      "options": ["data", "idade", "tamanho"]
+    },
+    "hints": {
+      "type": "string",
+      "title": "Dicas",
+      "description": "sim: fora de um repo git, uma linha diz que o status de git começa depois de git init.",
+      "default": "sim",
+      "options": ["sim", "não"]
+    },
+    "open": {
+      "type": "string",
+      "title": "Abrir arquivo com",
+      "description": "O que duplo clique ou Enter faz com um arquivo. Vazio: o app padrão. editor: $VISUAL, depois $EDITOR. preview: mostra no painel. Outro texto: um comando, com {path} e {dir}.",
+      "default": ""
+    },
+    "edit": {
+      "type": "string",
+      "title": "Editar com",
+      "description": "O que a tecla e faz no preview. Vazio: $VISUAL, depois $EDITOR. Outro texto: um comando com {path} e {line}, por exemplo code -g {path}:{line}.",
+      "default": ""
+    },
+    "agentTool": {
+      "type": "boolean",
+      "title": "Ferramenta de navegador para o Claude",
+      "description": "Dá ao Claude uma ferramenta para abrir e fechar páginas no navegador do terminal, por exemplo o localhost do seu app.",
+      "default": true
+    }
+  }
+}

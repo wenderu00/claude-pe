@@ -1,0 +1,14 @@
+{
+  "name": "claude-pe",
+  "owner": { "name": "Márcio Wendell", "url": "https://github.com/wenderu00" },
+  "metadata": {
+    "description": "Não oficial. Mods do Claude Code para devs do Governo de Pernambuco."
+  },
+  "plugins": [
+    {
+      "name": "claude-pe",
+      "source": "./",
+      "description": "Não oficial. Identidade visual do Governo de Pernambuco e apoio ao design system Liga Digital (@uigovpe)."
+    }
+  ]
+}
