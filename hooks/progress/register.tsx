@@ -1,14 +1,17 @@
 import { atom, read, update } from 'claude-code'
-import type { EngineInterface, On, PluginOptions } from 'claude-code'
+import type { ElementTable, EngineInterface, On, PluginOptions } from 'claude-code'
 import type { AbovePromptEvent, AbovePromptNext, AbovePromptResult, PartEvent, PartNext, PartResult } from '../parts'
 
 import type { AgentRun, Flow, Panel, PlannedTask, TaskItem } from '../../types'
 import { TOKENS } from '../pe/ds.generated'
 import { halfBlocks, LIS_BODY, LIS_PALETTE, LIS_TERMINAL } from './lis'
-import { applyTaskCall, flowOf } from './tasks'
+import type { Cell } from './lis'
+import { applyTaskCall, crewFlow, flowOf } from './tasks'
 
 const flow = atom({ plugin: 'pe-devkit', key: 'progressFlow' } as const, null)
 const agents = atom({ plugin: 'pe-devkit', key: 'progressAgents' } as const, [])
+// How many agents there were when the agents bar was dismissed; a new agent brings it back.
+const crewHidden = atom({ plugin: 'pe-devkit', key: 'progressCrewHidden' } as const, -1)
 const panel = atom({ plugin: 'pe-devkit', key: 'progressPanel' } as const, {
   isCompact: false,
   isDoneCollapsed: false,
@@ -68,6 +71,7 @@ const label = (f: Flow): string => {
   if (f.isFinished) return s.done
   if (f.phase === 'plan') return s.plan
   if (f.phase === 'design') return s.design
+  if (f.phase === 'agents') return `${s.pane} ${f.done}/${f.total}`
   const count = f.total ? `${f.done}/${f.total}` : `${f.running} ${s.busy}`
   return `${f.phase === 'review' ? s.review : s.tasks} ${count}`
 }
@@ -209,11 +213,68 @@ ${CRAB_CSS}${crab(W - CRAB_W + 1, 0, 'other', false, isWorking, 0.8)}
 </svg>`
 }
 
-// Half blocks, blue over white, with the star at the head of the fill.
-const flagBar = (r: number, width: number) => {
-  const filled = Math.round(width * r)
-  return { fill: '▀'.repeat(Math.max(0, filled - 1)), star: filled > 0, rest: '░'.repeat(Math.max(0, width - filled)) }
+// The whole flag in 6 pixel rows, as LIS_PALETTE keys plus `w`: four rows of blue
+// with the rainbow arc standing on the white, two rows of white.
+const FLAG_ROWS = 6
+const HORIZON = 4
+
+const flagGrid = (width: number): string[] => {
+  const rows = Array.from({ length: FLAG_ROWS }, (_, y) => Array.from({ length: width }, () => (y < HORIZON ? 'b' : 'w')))
+  if (width >= 12) {
+    const cx = (width - 1) / 2
+    const rx = 0.42 * width
+    for (let x = 0; x < width; x++) {
+      const dx = (x - cx) / rx
+      if (Math.abs(dx) > 1) continue
+      const top = Math.round(HORIZON - (HORIZON - 1) * Math.sqrt(1 - dx * dx))
+      ;['r', 'y', 'g'].forEach((c, i) => {
+        if (top + i < HORIZON) rows[top + i]![x] = c
+      })
+    }
+  }
+  return rows.map(r => r.join(''))
 }
+
+// The emblem's glyphs at the middle column, one per cell row: the star above the arc,
+// the sun inside it, the cross on the white.
+const FLAG_GLYPHS: readonly Cell[] = [
+  { ch: '★', fg: LIS_PALETTE.y, bg: LIS_PALETTE.b },
+  { ch: '✹', fg: LIS_PALETTE.y, bg: LIS_PALETTE.b },
+  { ch: '✝', fg: LIS_PALETTE.r, bg: FLAG_WHITE },
+]
+
+// Three rows of cells: the flag where the bar is filled, a dim shade beyond.
+const flagBar = (r: number, width: number): Cell[][] => {
+  const filled = Math.round(width * r)
+  const cells = halfBlocks(flagGrid(width), { ...LIS_PALETTE, w: FLAG_WHITE })
+  const mid = Math.floor((width - 1) / 2)
+  return cells.map((row, i) =>
+    row.map((cell, x) => {
+      if (x >= filled) return { ch: '░' }
+      return width >= 3 && x === mid ? FLAG_GLYPHS[i]! : cell
+    }),
+  )
+}
+
+// One Text per row of the bar, with runs of the same colours joined.
+const flagRows = (Text: ElementTable['Text'], cells: Cell[][]) =>
+  cells.map((row, i) => {
+    const runs: Cell[] = []
+    for (const c of row) {
+      const last = runs[runs.length - 1]
+      if (last && last.ch[0] === c.ch && last.fg === c.fg && last.bg === c.bg) last.ch += c.ch
+      else runs.push({ ...c })
+    }
+    return (
+      <Text key={`flag-${i}`}>
+        {runs.map((c, x) => (
+          <Text key={String(x)} color={c.fg} backgroundColor={c.bg} dimColor={c.ch[0] === '░'}>
+            {c.ch}
+          </Text>
+        ))}
+      </Text>
+    )
+  })
 
 // ---------------------------------------------------------------------------
 // Agents panel: every subagent of the session, plus the tasks the flow planned.
@@ -702,7 +763,10 @@ export async function progressTurnComplete($: EngineInterface, e: PartEvent<'tur
 }
 
 export async function progressAbovePrompt($: EngineInterface, e: AbovePromptEvent, next: AbovePromptNext): AbovePromptResult {
-  const f = await read($, flow)
+  const list = await read($, agents)
+  const tasked = await read($, flow)
+  // Without a task list the bar follows the agents, unless it was dismissed since the last one started.
+  const f = tasked ?? ((await read($, crewHidden)) === list.length ? null : crewFlow(list))
   if (f === null || e.props.hasSurvey) return next(e)
   // Draw this row with the other mods' bands beneath it. Claude Code's own placeholder ({ type: 'engine' }) is
   // never nested: the desktop drops a band that nests it.
@@ -711,7 +775,6 @@ export async function progressAbovePrompt($: EngineInterface, e: AbovePromptEven
 
   const ui = $.ui.resolve(e)
   const { Box, Text, Button } = ui
-  const list = await read($, agents)
   const crew = list.length + plannedOf(f, list).length
   const isWorking = list.some(a => a.status === 'running')
   const crewButton = (
@@ -724,7 +787,7 @@ export async function progressAbovePrompt($: EngineInterface, e: AbovePromptEven
       label="✕"
       plain
       role="dismiss"
-      onPress={() => update($, flow, () => null)}
+      onPress={() => (tasked ? update($, flow, () => null) : update($, crewHidden, () => list.length))}
     />
   )
 
@@ -749,7 +812,6 @@ export async function progressAbovePrompt($: EngineInterface, e: AbovePromptEven
   const cols = e.props.bodyColumns
   const titleW = Math.max(8, Math.min(30, f.title.length + 2, Math.floor(cols / 3)))
   const width = Math.max(6, Math.min(40, cols - titleW - 32))
-  const bar = flagBar(ratio(f), width)
   return (
     <Box flexDirection="column">
       <Box flexDirection="row" gap={2}>
@@ -757,10 +819,8 @@ export async function progressAbovePrompt($: EngineInterface, e: AbovePromptEven
           <Text color={f.isFinished ? DONE : ACCENT}>● </Text>
           <Text wrap="truncate-end">{f.title}</Text>
         </Box>
-        <Box flexShrink={0}>
-          {bar.fill ? <Text color={LIS_PALETTE.b} backgroundColor={FLAG_WHITE}>{bar.fill}</Text> : null}
-          {bar.star ? <Text color={LIS_PALETTE.y} backgroundColor={LIS_PALETTE.b}>★</Text> : null}
-          {bar.rest ? <Text dimColor>{bar.rest}</Text> : null}
+        <Box flexDirection="column" flexShrink={0}>
+          {flagRows(Text, flagBar(ratio(f), width))}
         </Box>
         <Text bold>{label(f)}</Text>
         <Text dimColor>{percent}</Text>
@@ -954,11 +1014,6 @@ export const register = (on: On, options: PluginOptions): void => {
     // Terminal: the same content in text rows.
     const cols = Math.max(24, e.props.bodyColumns || 40)
     const barW = Math.max(6, Math.min(20, cols - 34))
-    const flagTexts = (bar: ReturnType<typeof flagBar>) => [
-      bar.fill ? <Text key="fill" color={LIS_PALETTE.b} backgroundColor={FLAG_WHITE}>{bar.fill}</Text> : null,
-      bar.star ? <Text key="star" color={LIS_PALETTE.y} backgroundColor={LIS_PALETTE.b}>★</Text> : null,
-      bar.rest ? <Text key="rest" dimColor>{bar.rest}</Text> : null,
-    ]
     const row = (a: AgentRun) => {
       const tier = tierOf(a.type)
       const color = colorOf(tier)
@@ -980,14 +1035,14 @@ export const register = (on: On, options: PluginOptions): void => {
             {tier === 'other' ? a.type : tierWord(tier)} · {model}
             {a.round > 1 ? ` · ${s.round} ${a.round}` : ''}
           </Text>
-          <Text wrap="truncate-end">
-            {'  '}
-            {progress === null ? <Text dimColor>{ctxBar(ctx, barW)}</Text> : flagTexts(flagBar(progress, barW))}
-            <Text dimColor>
-              {' '}
+          <Box flexDirection="row" marginLeft={2} gap={1}>
+            <Box flexDirection="column" flexShrink={0}>
+              {progress === null ? <Text dimColor>{ctxBar(ctx, barW)}</Text> : flagRows(Text, flagBar(progress, barW))}
+            </Box>
+            <Text dimColor wrap="truncate-end">
               {steps}{s.ctx} {ctx}% · {fmtTokens(a.contextTokens)} ≈{fmtCost(a.costUsd)} {fmtTime(elapsed(a, at))}
             </Text>
-          </Text>
+          </Box>
         </Box>
       )
     }

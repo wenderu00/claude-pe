@@ -118,6 +118,7 @@ declare module 'claude-code' {
       // The task bar and the agents panel (hooks/progress).
       progressFlow: Flow | null
       progressAgents: AgentRun[]
+      progressCrewHidden: number
       progressPanel: Panel
       progressNow: number
       progressTasks: TaskItem[]
@@ -161,7 +162,7 @@ declare module 'claude-code' {
 export type TaskStatus = 'pending' | 'in_progress' | 'completed'
 export type TaskItem = { id: string; subject: string; active: string; status: TaskStatus }
 
-export type Phase = 'plan' | 'design' | 'delegate' | 'review' | 'close'
+export type Phase = 'plan' | 'design' | 'delegate' | 'review' | 'close' | 'agents'
 
 export type PlannedTask = {
   title: string

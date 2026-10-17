@@ -1,4 +1,4 @@
-import { expect, test } from 'claude-code/testing'
+import { expect, mock, test } from 'claude-code/testing'
 import type { Engine } from 'claude-code/testing'
 import type { On } from 'claude-code'
 
@@ -94,27 +94,111 @@ async function halfDone($: Engine) {
   await setStatus($, '1', 'completed')
 }
 
-test('terminal: the done part of the bar is the flag, blue over white, with the star at its head', async ($, on) => {
+const RED = '#D7262B'
+const YELLOW = '#F5C400'
+
+type Mounted = Awaited<ReturnType<Engine['ui']['mount']>>
+
+// The colours of the half-block cells: each one is a pixel above (color) and one below (backgroundColor).
+const pixelColours = async (ui: Mounted) =>
+  new Set((await ui.findAll({ type: 'Text', text: /^[▀▄]+$/ })).flatMap(t => [t.props.color, t.props.backgroundColor]).filter(Boolean))
+
+// The emblem: the star above the arc, the sun inside it, the cross on the white.
+async function emblem(ui: Mounted) {
+  const one = async (glyph: RegExp) => (await ui.findAll({ type: 'Text', text: glyph })).map(t => t.props.color)
+  return { star: await one(/^★$/), sun: await one(/^✹$/), cross: await one(/^✝$/) }
+}
+
+const terminal = ($: Engine) => $.ui.mount({ plugin: PLUGIN, surface: 'terminal', component: 'AbovePrompt', props: band })
+
+test('terminal: a full bar is the whole flag, with the star, the arc, the sun and the cross', async ($, on) => {
   taskEngine(on)
-  await halfDone($)
-  const ui = await $.ui.mount({ plugin: PLUGIN, surface: 'terminal', component: 'AbovePrompt', props: band })
-  const fill = await ui.findAll({ type: 'Text', text: /^▀+$/ })
-  expect(fill).toHaveLength(1)
-  expect(fill[0]?.props.color).toBe(BLUE)
-  expect(fill[0]?.props.backgroundColor).toBe(WHITE)
-  const star = await ui.findAll({ type: 'Text', text: '★' })
-  expect(star).toHaveLength(1)
-  expect(star[0]?.props.color).toBe('#F5C400')
+  await create($, 'Uma')
+  await create($, 'Duas')
+  await setStatus($, '1', 'completed')
+  await setStatus($, '2', 'completed')
+  const ui = await terminal($)
+  expect(await emblem(ui)).toEqual({ star: [YELLOW], sun: [YELLOW], cross: [RED] })
+  const colours = await pixelColours(ui)
+  for (const c of FLAG) expect(colours.has(c)).toBe(true)
   await ui.unmount()
 })
 
-test('terminal: with nothing done, the bar has no flag and no star', async ($, on) => {
+test('terminal: a bar filled short of the middle shows blue over white, but not the emblem yet', async ($, on) => {
+  taskEngine(on)
+  for (const s of ['Uma', 'Duas', 'Três', 'Quatro']) await create($, s)
+  await setStatus($, '1', 'completed')
+  const ui = await terminal($)
+  expect(await emblem(ui)).toEqual({ star: [], sun: [], cross: [] })
+  const colours = await pixelColours(ui)
+  expect(colours.has(BLUE)).toBe(true)
+  expect(colours.has(WHITE)).toBe(true)
+  await ui.unmount()
+})
+
+test('terminal: with nothing done, the bar has no flag', async ($, on) => {
   taskEngine(on)
   await create($, 'Uma')
-  const ui = await $.ui.mount({ plugin: PLUGIN, surface: 'terminal', component: 'AbovePrompt', props: band })
-  expect(await ui.findAll({ type: 'Text', text: /▀/ })).toHaveLength(0)
-  expect(await ui.findAll({ type: 'Text', text: /★/ })).toHaveLength(0)
+  const ui = await terminal($)
+  expect((await pixelColours(ui)).size).toBe(0)
+  expect(await emblem(ui)).toEqual({ star: [], sun: [], cross: [] })
   await ui.unmount()
+})
+
+// Workers, as the engine starts and ends them.
+function crewEngine(on: On) {
+  mock.clock(on)
+  on('ui.open', () => ({ value: { isPlaced: true } }))
+  let n = 0
+  on('agent.spawn', () => ({ model: 'claude-sonnet-5-5', agentId: `a${++n}` }))
+  on('turn.complete', () => ({ text: '' }) as never)
+}
+
+const spawn = ($: Engine, description: string) =>
+  $.agent.spawn({ tool_use_id: description, prompt: 'p', description, subagentType: 'Explore', provider: 'engine', parentModel: 'claude-sonnet-5-5', background: false, fork: false } as never)
+const end = ($: Engine, agentId: string) => ($.turn.complete as (e: unknown) => Promise<unknown>)({ agentId, reason: 'answer', answer: 'ok' })
+
+async function crewBand($: Engine) {
+  const ui = await terminal($)
+  const label = (await ui.findAll({ type: 'Text', text: /^(Agentes \d+\/\d+|Tarefas \d+\/\d+|Concluído)$/ })).map(t => t.text)
+  const title = (await ui.findAll({ type: 'Text', text: /^Agente / })).map(t => t.text)
+  await ui.unmount()
+  return { label, title }
+}
+
+test('with no task list, the bar follows the session’s agents', async ($, on) => {
+  floor(on)
+  crewEngine(on)
+  await spawn($, 'Agente um')
+  await spawn($, 'Agente dois')
+  await spawn($, 'Agente três')
+  await end($, 'a1')
+  expect(await crewBand($)).toEqual({ label: ['Agentes 1/3'], title: ['Agente dois'] })
+
+  await end($, 'a2')
+  await end($, 'a3')
+  expect((await crewBand($)).label).toEqual(['Concluído'])
+})
+
+test('a task list wins over the agents', async ($, on) => {
+  taskEngine(on)
+  crewEngine(on)
+  await spawn($, 'Agente um')
+  await create($, 'Uma')
+  expect((await crewBand($)).label).toEqual(['Tarefas 0/1'])
+})
+
+test('dismissed, the agents bar comes back with the next agent', async ($, on) => {
+  floor(on)
+  crewEngine(on)
+  await spawn($, 'Agente um')
+  const ui = await terminal($)
+  await ui.press({ key: 'progress-dismiss' })
+  await ui.unmount()
+  expect((await crewBand($)).label).toEqual([])
+
+  await spawn($, 'Agente dois')
+  expect((await crewBand($)).label).toEqual(['Agentes 0/2'])
 })
 
 test('desktop: the done part of the bar is drawn in all the flag colours', async ($, on) => {

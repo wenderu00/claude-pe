@@ -10,6 +10,7 @@ const MODEL = 'claude-sonnet-5-5'
 const BLUE = '#2348D0'
 const WHITE = '#FFFFFF'
 const YELLOW = '#F5C400'
+const RED = '#D7262B'
 
 const worker = async ($: Engine, on: On) => {
   mock.clock(on)
@@ -28,16 +29,15 @@ const flagFill = async (ui: Awaited<ReturnType<typeof mountPane>>) =>
 const mountPane =($: Engine, surface: 'terminal' | 'desktop') =>
   $.ui.mount({ plugin: PLUGIN, surface, component: 'Pane', requestId: 'progress-agents', props: pane })
 
-test('terminal: a finished agent’s bar is the flag, blue over white, with the star at its head', async ($, on) => {
+test('terminal: a finished agent’s bar is the whole flag: blue over white, the star, the sun and the cross', async ($, on) => {
   await worker($, on)
   await finish($)
   const ui = await mountPane($, 'terminal')
-  const fill = await flagFill(ui)
-  expect(fill).toHaveLength(1)
-  expect(fill[0]?.props.color).toBe(BLUE)
-  const star = await ui.findAll({ type: 'Text', text: /^★$/ })
-  expect(star).toHaveLength(1)
-  expect(star[0]?.props.color).toBe(YELLOW)
+  expect((await flagFill(ui)).length).toBeGreaterThan(0)
+  const colour = async (glyph: RegExp) => (await ui.findAll({ type: 'Text', text: glyph })).map(t => t.props.color)
+  expect(await colour(/^★$/)).toEqual([YELLOW])
+  expect(await colour(/^✹$/)).toEqual([YELLOW])
+  expect(await colour(/^✝$/)).toEqual([RED])
   await ui.unmount()
 })
 

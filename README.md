@@ -8,12 +8,14 @@ Um mod do Claude Code para devs que constroem serviços do Governo de Pernambuco
 
 - **Visual de Pernambuco.** A skin `pernambuco` usa as cores dos tokens da Liga Digital
   (`@uigovpe/styles`), no terminal claro e no escuro.
-- **Progresso.** Uma barra acima do prompt segue a lista de tarefas do Claude. A parte feita
-  da barra é a bandeira de Pernambuco: azul sobre branco, com o arco-íris, a estrela e a cruz
-  na ponta (no terminal, meio-blocos azul sobre branco e uma estrela). O painel
-  `/agents-info` mostra os subagentes, com modelo, contexto, custo e tempo. A barra de
-  progresso de cada agente também é azul sobre branco; sem progresso informado, a barra
-  mostra o contexto, em cinza. A mascote Lis, em
+- **Progresso.** Uma barra acima do prompt segue a lista de tarefas do Claude; sem lista de
+  tarefas, ela segue os subagentes da sessão ("Agentes 1/3"). No terminal, a barra é a
+  bandeira de Pernambuco inteira em 3 linhas (azul, a estrela, o arco-íris, o sol e a cruz
+  sobre o branco), e o progresso revela a bandeira da esquerda para a direita. No app desktop,
+  a parte feita é azul sobre branco, com o arco-íris, a estrela e a cruz na ponta. O painel
+  `/agents-info` mostra os subagentes, com modelo, contexto, custo e tempo. Um agente que
+  termina mostra a bandeira na sua barra; enquanto roda, a barra mostra o contexto, em cinza.
+  A mascote Lis, em
   pixel art com a bandeira de Pernambuco no peito, anda na barra e no painel (no app desktop) e
   fica no topo do painel no terminal. O mascote da tela inicial do Claude Code não muda: a API
   de mods não deixa desenhar ali.
