@@ -4,6 +4,7 @@ import type { AbovePromptEvent, AbovePromptNext, AbovePromptResult, PartEvent, P
 
 import type { AgentRun, Flow, Panel, PlannedTask, TaskItem } from '../../types'
 import { TOKENS } from '../pe/ds.generated'
+import { halfBlocks, LIS_BODY, LIS_PALETTE, LIS_TERMINAL } from './lis'
 import { applyTaskCall, flowOf } from './tasks'
 
 const flow = atom({ plugin: 'pe-devkit', key: 'progressFlow' } as const, null)
@@ -349,10 +350,9 @@ const PANE_CSS = `<style>
 @media (prefers-reduced-motion: reduce){.live{animation:none}}
 </style>`
 
-// Pixel Clawd from DockCrab (Clawdy): a 24×18 crab on a 30×28 grid, one costume per tier.
-// The body keeps the brand clay; the tier's color lives in the costume's accent.
-const CLAY = '#D97757'
-const INK = '#1F1E1D'
+// Pixel Lis (./lis) on the 30×28 grid of DockCrab's (Clawdy) crab, one DockCrab costume
+// per tier. The body keeps the flag colours; the tier's color lives in the costume's accent.
+const INK = LIS_PALETTE.k
 
 // `cls` puts a pixel in a named group: `bd` (the default) is the body and its
 // costume, `la`/`lb` the leg pairs, anything else a prop with its own motion.
@@ -361,17 +361,15 @@ type Fill = (x: number, y: number, w: number, h: number, c: string, cls?: string
 const stamp = (f: Fill, x: number, y: number, rows: string[], map: Record<string, string>, cls?: string): void =>
   rows.forEach((row, dy) => [...row].forEach((ch, dx) => map[ch] && f(x + dx, y + dy, 1, 1, map[ch] ?? '', cls)))
 
-// `armCls` lets a raised claw travel with the prop it holds.
-const crabBody = (f: Fill, armFront = 0, armCls?: string): void => {
-  f(7, 10, 16, 12, CLAY)
-  f(3, 14, 4, 4, CLAY)
-  f(23, 14 + armFront, 4, 4, CLAY, armCls)
-  f(9, 12, 2, 2, INK)
-  f(19, 12, 2, 2, INK)
-  f(7, 22, 2, 4, CLAY, 'la')
-  f(17, 22, 2, 4, CLAY, 'la')
-  f(11, 22, 2, 4, CLAY, 'lb')
-  f(21, 22, 2, 4, CLAY, 'lb')
+// `armCls` lets a raised arm travel with the prop it holds.
+const lisBody = (f: Fill, armFront = 0, armCls?: string): void => {
+  stamp(f, 3, 4, LIS_BODY, LIS_PALETTE)
+  f(23, 14 + armFront, 4, 3, LIS_PALETTE.b, armCls)
+  f(23, 17 + armFront, 4, 1, LIS_PALETTE.o, armCls)
+  f(7, 22, 2, 4, LIS_PALETTE.b, 'la')
+  f(17, 22, 2, 4, LIS_PALETTE.b, 'la')
+  f(11, 22, 2, 4, LIS_PALETTE.b, 'lb')
+  f(21, 22, 2, 4, LIS_PALETTE.b, 'lb')
 }
 
 // Pure CSS, run by the compositor: no redraws. Periods divide one second, so the
@@ -406,7 +404,7 @@ const CRAB_CSS = `<style>
 const COSTUMES: Record<string, (f: Fill, t: string) => void> = {
   // Fable: astronaut in a glass dome; floats instead of walking, the antenna and the star blink.
   fable: (f, t) => {
-    crabBody(f)
+    lisBody(f)
     f(6, 7, 18, 1, '#E6E8EE'); f(5, 8, 1, 14, '#E6E8EE'); f(24, 8, 1, 14, '#E6E8EE'); f(6, 22, 18, 1, '#C9CCD2')
     f(6, 8, 18, 14, 'rgba(169,214,245,.32)'); f(8, 9, 2, 1, '#fff'); f(8, 10, 1, 2, '#fff')
     f(14, 4, 2, 3, '#C9CCD2'); f(14, 2, 2, 2, t, 'ant'); f(13, 18, 4, 2, t)
@@ -414,7 +412,7 @@ const COSTUMES: Record<string, (f: Fill, t: string) => void> = {
   },
   // Heavy: detective with a deerstalker; the magnifier sweeps and glints.
   heavy: (f, t) => {
-    crabBody(f, -4, 'it')
+    lisBody(f, -4, 'it')
     stamp(f, 6, 3, ['......bbbbbb......', '....bbcbbcbbbb....', '...bbbbbbbbbbbb...', '..bcbbcbbcbbcbbb..', '.bbbbbbbbbbbbbbbb.', 'dddddddddddddddddd'], { b: '#7A4A26', c: '#A0703F', d: '#5A3519' })
     f(6, 9, 18, 1, t)
     stamp(f, 23, 1, ['.kkk.', 'k...k', 'k...k', 'k...k', '.kkk.'], { k: '#3A3A3C' }, 'it')
@@ -422,32 +420,32 @@ const COSTUMES: Record<string, (f: Fill, t: string) => void> = {
   },
   // Careful: engineer in a hard hat; the wrench turns a bolt.
   careful: (f, t) => {
-    crabBody(f)
+    lisBody(f)
     stamp(f, 6, 4, ['.....yyyyyyyy.....', '...yyyyyhhyyyyy...', '..yyyyyyhhyyyyyy..', '..yyyyyyhhyyyyyy..', '.yyyyyyyhhyyyyyyy.', 'dddddddddddddddddd'], { y: '#F5C542', h: '#FBE08A', d: '#C99A1E' })
     f(13, 5, 4, 2, t)
     stamp(f, 0, 10, ['.s.s', 'sss.', '.s..', '.s..'], { s: '#8E929A' }, 'it')
   },
   // Medium: chef, the toque traced from DockCrab's Sprites.chefHat; tosses the omelette.
   medium: (f, t) => {
-    crabBody(f, -4, 'pan')
+    lisBody(f, -4, 'pan')
     stamp(f, 6, 0, ['........lll.......', '.......lllll......', '.wwwwgwwwwwwgwwwww', 'wwwwwwwwwwwwwwwwww', 'wwwwwwwwwwwwwwwwww', 'wwwwwgwwwwwggwwwww', '.wwwwgwwwwwggwwwww', '.dddbbbbbbbbbbbbb.', '.dddbbbbbbbbbbbbb.', '.dddbbbbbbbbbbbbb.'], { w: '#F4F3EE', l: '#F7F6F2', g: '#D2D1C8', b: t, d: '#B45F43' })
     f(22, 8, 7, 2, '#4A4A48', 'pan'); f(26, 10, 1, 1, '#4A4A48', 'pan'); f(24, 7, 3, 1, '#F5B731', 'egg')
   },
   // Light: racer in a helmet; runs at double pace, the checkered flag flutters.
   light: (f, t) => {
-    crabBody(f, -4)
+    lisBody(f, -4)
     stamp(f, 6, 5, ['....rrrrrrrrrr....', '..rrrrrrwwrrrrrr..', '.rrrrrrrwwrrrrrrr.', '.rrrrrrrwwrrrrrrr.', '.rrrrrrrwwrrrrrrr.', '.kkkkkkkkkkkkkkkkr'], { r: t, w: '#F8F6F1', k: INK })
     f(25, 1, 1, 9, '#8E929A')
     stamp(f, 26, 1, ['wkwk', 'kwkw', 'wkwk'], { w: '#F8F6F1', k: INK }, 'flag')
   },
   // Explore: pirate scouting the code; the cutlass fences.
   explore: f => {
-    crabBody(f)
+    lisBody(f)
     stamp(f, 5, 3, ['.kk..............kk.', '.kkk....kkkk....kkk.', '..kkkkkkkwwkkkkkkk..', '..kkkkkkkkkkkkkkkk..', '.gggggggggggggggggg.'], { k: '#55514C', w: '#F8F6F1', g: '#F5C542' })
     f(7, 11, 11, 1, INK); f(18, 11, 4, 3, INK)
     f(27, 6, 1, 9, '#C9CCD2', 'it'); f(26, 15, 3, 1, '#7A4A26', 'it')
   },
-  other: f => crabBody(f),
+  other: f => lisBody(f),
 }
 
 const costumeOf = (type: string): string => (type === 'Explore' ? 'explore' : tierOf(type))
@@ -463,7 +461,7 @@ const crab = (x: number, y: number, costume: string, dim = false, isWalking = fa
     if (!groups.has(cls)) groups.set(cls, [])
     groups.get(cls)?.push(`<rect x="${cx}" y="${cy}" width="${w}" height="${h}" fill="${c}"/>`)
   }
-  const draw = COSTUMES[costume] ?? ((g: Fill) => crabBody(g))
+  const draw = COSTUMES[costume] ?? ((g: Fill) => lisBody(g))
   draw(f, colorOf(costume))
   const group = (cls: string) => `<g class="${cls}">${(groups.get(cls) ?? []).join('')}</g>`
   const props = [...groups.keys()].filter(k => k !== 'bd' && k !== 'la' && k !== 'lb')
@@ -732,7 +730,7 @@ export async function progressAbovePrompt($: EngineInterface, e: AbovePromptEven
         <Text color={f.isFinished ? DONE : ACCENT}>{barText(f, width)}</Text>
         <Text bold>{label(f)}</Text>
         <Text dimColor>{percent}</Text>
-        <Text color={CLAY}>▣</Text>
+        <Text color={LIS_PALETTE.b}>▣</Text>
         {crewButton}
         {dismiss}
       </Box>
@@ -955,17 +953,39 @@ export const register = (on: On, options: PluginOptions): void => {
       )
     }
 
+    // Lis beside the header, where the pane leaves room for the header text.
+    const lis =
+      cols >= 40 &&
+      halfBlocks(LIS_TERMINAL, LIS_PALETTE).map((cells, i) => (
+        <Text key={`lis-${i}`}>
+          {cells.map((c, x) => (
+            <Text key={String(x)} color={c.fg} backgroundColor={c.bg}>
+              {c.ch}
+            </Text>
+          ))}
+        </Text>
+      ))
+
     return (
       <Box flexDirection="column">
-        <Box flexDirection="row" justifyContent="space-between">
-          <Text bold wrap="truncate-end">
-            {title}
-          </Text>
-          {toggleCompact}
+        <Box flexDirection="row" gap={2}>
+          {lis && (
+            <Box flexDirection="column" flexShrink={0}>
+              {lis}
+            </Box>
+          )}
+          <Box flexDirection="column" flexGrow={1}>
+            <Box flexDirection="row" justifyContent="space-between">
+              <Text bold wrap="truncate-end">
+                {title}
+              </Text>
+              {toggleCompact}
+            </Box>
+            <Text dimColor>
+              ≈{fmtCost(t.cost)} · {fmtTokens(t.tokens)} {s.tokensWord} · {fmtTime(t.time)}
+            </Text>
+          </Box>
         </Box>
-        <Text dimColor>
-          ≈{fmtCost(t.cost)} · {fmtTokens(t.tokens)} {s.tokensWord} · {fmtTime(t.time)}
-        </Text>
         {p.isCompact ? (
           <Text wrap="truncate-end">
             {[...running, ...finished].map(a => (
