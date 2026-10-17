@@ -1015,7 +1015,7 @@ test('the band draws each meter on its own, sized to its words, spread evenly be
   await startDesktop($, on)
 
   const band = await $.ui.mount(BAND('desktop', false))
-  const meters = (await band.findAll({ type: 'Svg' })) as { props: { alt: string; width: number } }[]
+  const meters = await band.findAll({ type: 'Svg' })
   expect(meters.map(el => el.props.alt)).toEqual([expect.stringContaining('context'), expect.stringContaining('5h'), expect.stringContaining('7d')])
   // Each as wide as its ring and words, not a fixed 132px slot, so the gaps between them are what spreads.
   for (const meter of meters) expect(meter.props.width).toBeLessThan(132)
@@ -1478,7 +1478,7 @@ test('with countdown on, the band says when each limit resets, on both surfaces'
   await runSkin($, 'countdown on')
   const band = await $.ui.mount(BAND('desktop', false))
   expect(await svgSource(band)).toContain('5h · 1h40')
-  expect(((await band.findAll({ type: 'Svg' })) as { props: { alt: string } }[]).map(el => el.props.alt).join(', ')).toContain('5h 18%, resets in 1h40')
+  expect((await band.findAll({ type: 'Svg' })).map(el => el.props.alt).join(', ')).toContain('5h 18%, resets in 1h40')
 
   const line = await $.ui.mount(BAND('terminal', false))
   expect(await line.find({ type: 'Text', text: ' 18% 5h · 1h40' })).toBeDefined()
