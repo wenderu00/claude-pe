@@ -52,6 +52,19 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
 
 `/pe-scaffold <pasta>` cria um projeto Next.js novo já assim, com a `GovBar` na página inicial.
 
+## Conferir na tela
+
+Depois de mudar a interface, com o app rodando (`npm run dev`):
+
+1. Abra a página com a ferramenta `mcp__pe-devkit__browser_open` (por exemplo `localhost:3000`).
+   Ela abre o terminal-browser num painel ao lado da conversa.
+2. Leia a página com `terminal-browser action -- snapshot` (Bash). Para agir na página, use
+   `terminal-browser action -- click` ou `fill` sobre o que o snapshot mostrar.
+3. No fim, rode `terminal-browser action done`.
+
+Se a ferramenta disser que o terminal-browser não está instalado, peça ao dev para abrir o
+link no navegador dele. Não diga que conferiu a tela se não conseguiu abrir a página.
+
 ## Como achar um componente
 
 1. Abra `references/components/index.md` e escolha pelo nome.
