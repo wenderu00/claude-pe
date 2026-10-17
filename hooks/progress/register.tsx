@@ -210,8 +210,8 @@ ${CRAB_CSS}${crab(W - CRAB_W + 1, 0, 'other', false, isWorking, 0.8)}
 }
 
 // Half blocks, blue over white, with the star at the head of the fill.
-const flagBar = (f: Flow, width: number) => {
-  const filled = Math.round(width * ratio(f))
+const flagBar = (r: number, width: number) => {
+  const filled = Math.round(width * r)
   return { fill: '▀'.repeat(Math.max(0, filled - 1)), star: filled > 0, rest: '░'.repeat(Math.max(0, width - filled)) }
 }
 
@@ -570,7 +570,14 @@ const agentSvg = (W: number, a: AgentRun, at: number): string => {
 <text ${startText(W, 42, 34)} font-family="${FONT}" font-size="11"><tspan fill="${color}">${xml(tier === 'other' ? a.type : tierWord(tier))}</tspan><tspan class="s">  ${xml(meta.join('  ·  '))}</tspan></text>
 ${steps && stepsW > 30 ? `<text class="t" ${startText(W, 42, 49)} font-family="${FONT}" font-size="11" font-variant-numeric="tabular-nums">${xml(fitText(steps, 11, stepsW))}</text>` : ''}
 <text class="s" ${endText(W, 42 + barW, 49, true)} font-family="${FONT}" font-size="11" font-variant-numeric="tabular-nums">${stats}</text>
-<rect class="k" x="${mx(W, 42, barW)}" y="55" width="${barW}" height="4" rx="2"/><rect${progress === null ? ' class="m"' : ''} x="${mx(W, 42, fillW)}" y="55" width="${fillW}" height="4" rx="2"${progress === null ? '' : ` fill="${color}"`}/>
+<rect class="k" x="${mx(W, 42, barW)}" y="54" width="${barW}" height="6" rx="3"/>${
+    progress === null
+      ? `<rect class="m" x="${mx(W, 42, fillW)}" y="54" width="${fillW}" height="6" rx="3"/>`
+      : // The white stripe sits inside the blue, so a thin blue edge keeps it visible on a light pane.
+        `<g class="flag"><rect x="${mx(W, 42, fillW)}" y="54" width="${fillW}" height="6" rx="3" fill="${LIS_PALETTE.b}"/>${
+          fillW > 5 ? `<rect x="${mx(W, 44.5, fillW - 5)}" y="57.5" width="${fillW - 5}" height="2" fill="${FLAG_WHITE}"/>` : ''
+        }</g>`
+  }
 ${statusMark(mx(W, W - 8), 16, a.status, color)}
 <line class="ln" x1="0" y1="65.5" x2="${W}" y2="65.5"/>`,
   )
@@ -742,7 +749,7 @@ export async function progressAbovePrompt($: EngineInterface, e: AbovePromptEven
   const cols = e.props.bodyColumns
   const titleW = Math.max(8, Math.min(30, f.title.length + 2, Math.floor(cols / 3)))
   const width = Math.max(6, Math.min(40, cols - titleW - 32))
-  const bar = flagBar(f, width)
+  const bar = flagBar(ratio(f), width)
   return (
     <Box flexDirection="column">
       <Box flexDirection="row" gap={2}>
@@ -947,6 +954,11 @@ export const register = (on: On, options: PluginOptions): void => {
     // Terminal: the same content in text rows.
     const cols = Math.max(24, e.props.bodyColumns || 40)
     const barW = Math.max(6, Math.min(20, cols - 34))
+    const flagTexts = (bar: ReturnType<typeof flagBar>) => [
+      bar.fill ? <Text key="fill" color={LIS_PALETTE.b} backgroundColor={FLAG_WHITE}>{bar.fill}</Text> : null,
+      bar.star ? <Text key="star" color={LIS_PALETTE.y} backgroundColor={LIS_PALETTE.b}>★</Text> : null,
+      bar.rest ? <Text key="rest" dimColor>{bar.rest}</Text> : null,
+    ]
     const row = (a: AgentRun) => {
       const tier = tierOf(a.type)
       const color = colorOf(tier)
@@ -970,7 +982,7 @@ export const register = (on: On, options: PluginOptions): void => {
           </Text>
           <Text wrap="truncate-end">
             {'  '}
-            {progress === null ? <Text dimColor>{ctxBar(ctx, barW)}</Text> : <Text color={color}>{ctxBar(progress * 100, barW)}</Text>}
+            {progress === null ? <Text dimColor>{ctxBar(ctx, barW)}</Text> : flagTexts(flagBar(progress, barW))}
             <Text dimColor>
               {' '}
               {steps}{s.ctx} {ctx}% · {fmtTokens(a.contextTokens)} ≈{fmtCost(a.costUsd)} {fmtTime(elapsed(a, at))}
