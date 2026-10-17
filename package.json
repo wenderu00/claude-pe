@@ -1,0 +1,15 @@
+{
+  "name": "claude-pe",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "sync-ds": "node scripts/sync-ds.ts",
+    "test:scripts": "node --test \"scripts/**/*.spec.ts\"",
+    "test:plugin": "claude plugin test .",
+    "validate": "claude plugin validate ."
+  },
+  "devDependencies": {
+    "postcss": "^8.5.30",
+    "typescript": "^5.9.3"
+  }
+}
