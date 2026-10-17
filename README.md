@@ -27,6 +27,11 @@ Um mod do Claude Code para devs que constroem serviços do Governo de Pernambuco
   projeto `@uigovpe`, o Claude recebe um aviso se usou `primereact` direto ou uma cor literal.
 - **`/pe-scaffold`** cria um projeto Next.js já configurado. **`/pe-component`** mostra um
   componente e abre a história dele.
+- **Construir aos poucos.** **`/pe-feature`** acrescenta uma parte nova ao sistema por vez
+  (uma tela, a rota e os dados de exemplo), a partir de receitas da Liga Digital: shell público
+  e backoffice com menu, formulário, lista com detalhe e formulário em passos. O trabalho segue
+  a lista de tarefas do Claude (e a barra da bandeira), e termina com `npm run build` e a tela
+  conferida no navegador.
 
 ## Requisitos
 
@@ -72,6 +77,7 @@ Responda `y` para adicionar o marketplace e escolha o escopo. Depois reinicie o 
 | `/browser [url]` | Abre o navegador do terminal. |
 | `/pe-component [Nome]` | Import, props e a história do componente no Storybook. Sem nome, lista todos. |
 | `/pe-scaffold <pasta>` | Cria um projeto Next.js (App Router, TypeScript) com `@uigovpe/components`, `@uigovpe/styles`, o `UiProvider` e a `GovBar`. |
+| `/pe-feature <o que a feature faz>` | Num projeto `@uigovpe`, acrescenta um incremento: escolhe a receita, cria as tarefas, constrói, põe a rota em `app/navigation.ts` e confere. Um pedido grande vira uma lista; só o primeiro item é feito. |
 
 Os comandos do `/skin` (`rail`, `tables`, `calm`…) ficam com os nomes originais do
 [claude-skins](https://github.com/hellosverre/claude-skins).
@@ -125,6 +131,16 @@ props dos `.d.ts`, lê o índice do Storybook e escreve:
 - `skills/pe-design-system/references/` (uma página por componente, o índice e os tokens);
 - `hooks/pe/ds.generated.ts` (tokens, componentes e módulos `primereact` envolvidos).
 
+Depois, confira as receitas (`skills/pe-design-system/references/recipes/`) com a versão nova:
+
+```bash
+npm run check-recipes
+```
+
+O script cria um projeto com os mesmos passos do `/pe-scaffold` em `.sync-ds/recipes`, escreve
+nele cada bloco ```` ```tsx file=<caminho> ```` das receitas e roda `next build` (tipos e a
+renderização de cada página no servidor). Precisa de rede.
+
 O mod não contém código nem CSS do `@uigovpe`: só documentação e valores de token gerados dos
 pacotes públicos. Os pacotes não declaram licença no npm.
 
@@ -132,7 +148,7 @@ pacotes públicos. Os pacotes não declaram licença no npm.
 
 ```bash
 npm install
-npm run test:scripts   # testes do sync-ds (Node)
+npm run test:scripts   # testes do sync-ds e das receitas (Node)
 npm run test:plugin    # testes do plugin (claude plugin test .)
 npm run validate       # claude plugin validate .
 claude --plugin-dir .  # uma sessão com o mod carregado desta pasta

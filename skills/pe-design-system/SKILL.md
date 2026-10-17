@@ -52,6 +52,15 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
 
 `/pe-scaffold <pasta>` cria um projeto Next.js novo já assim, com a `GovBar` na página inicial.
 
+## Construir aos poucos
+
+Para uma tela inteira (shell com menu, formulário, lista com detalhe, formulário em passos),
+use as receitas em `references/recipes/` (comece por `index.md`), não uma composição nova.
+O mapa das páginas do sistema fica em `app/navigation.ts`.
+
+`/pe-feature <o que a feature faz>` acrescenta um incremento por vez: escolhe a receita, cria
+as tarefas, constrói e confere com `npm run build` e no navegador.
+
 ## Conferir na tela
 
 Depois de mudar a interface, com o app rodando (`npm run dev`):
