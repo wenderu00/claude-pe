@@ -4,6 +4,7 @@
   "type": "module",
   "scripts": {
     "sync-ds": "node scripts/sync-ds.ts",
+    "check-recipes": "node scripts/check-recipes.ts",
     "test:scripts": "node --test \"scripts/**/*.spec.ts\"",
     "test:plugin": "claude plugin test .",
     "validate": "claude plugin validate ."
