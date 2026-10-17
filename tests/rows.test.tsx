@@ -394,14 +394,14 @@ test('the markdown pack draws alerts and task lists everywhere, headings and par
   const terminal = await $.ui.mount(reply('terminal'))
   expect(await terminal.find({ type: 'Text', text: '▍ Plan' })).toBeDefined()
   expect(spanColor((await terminal.find({ type: 'Text', text: /Ran 54 tests/ })) as Found, '3.2s')).toBe(pernambuco.palette.user)
-  expect(await terminal.find({ type: 'Text', text: '▲ Warning' })).toBeDefined()
+  expect(await terminal.find({ type: 'Text', text: '▲ Aviso' })).toBeDefined()
   expect(JSON.stringify(await terminal.find({ type: 'Box' }))).toContain('"borderStyle":"round"')
   expect(await terminal.find({ type: 'Text', text: '☑ ' })).toBeDefined()
   expect(await terminal.find({ type: 'Text', text: '1/2 done' })).toBeDefined()
   await terminal.unmount()
 
   const desktop = await $.ui.mount(reply('desktop'))
-  expect(await desktop.find({ type: 'Text', text: '▲ Warning' })).toBeDefined()
+  expect(await desktop.find({ type: 'Text', text: '▲ Aviso' })).toBeDefined()
   // The desktop's own markdown sets headings and paragraphs.
   expect(((await desktop.find({ type: 'Markdown' })) as Found)?.props.text).toBe('## Plan\n\nRan 54 tests in 3.2s.')
   await desktop.unmount()
@@ -972,7 +972,7 @@ test('the band offers Compact, nudges at 70% context, and compacts on a press', 
   await $.session.start({ surface: 'desktop', isInteractive: true, cwd: '/work' })
 
   const band = await $.ui.mount(BAND('desktop', false))
-  expect(await band.find({ type: 'Text', text: 'Context is 85% full' })).toBeDefined()
+  expect(await band.find({ type: 'Text', text: 'Contexto 85% cheio' })).toBeDefined()
   // A digit hotkey reaches it from an empty prompt where the terminal reports no clicks.
   expect(((await band.find({ key: 'compact' })) as { props: { hotkey?: string } } | undefined)?.props.hotkey).toBe('0')
   await band.press({ key: 'compact' })
@@ -1035,7 +1035,7 @@ test('/skin compact off leaves the band to the meters, compact on brings the but
   for (const surface of SURFACES) {
     const band = await $.ui.mount(BAND(surface, false))
     expect(await band.find({ key: 'compact' }), `${surface}: no button`).toBeUndefined()
-    expect(await band.find({ type: 'Text', text: 'Context is 85% full' }), `${surface}: no nudge`).toBeUndefined()
+    expect(await band.find({ type: 'Text', text: 'Contexto 85% cheio' }), `${surface}: no nudge`).toBeUndefined()
     expect(await spreadsEvenly(band), `${surface}: the meters still spread`).toBe(true)
     await band.unmount()
   }
@@ -1043,7 +1043,7 @@ test('/skin compact off leaves the band to the meters, compact on brings the but
   await runSkin($, 'compact on')
   const band = await $.ui.mount(BAND('desktop', false))
   expect(await band.find({ key: 'compact' })).toBeDefined()
-  expect(await band.find({ type: 'Text', text: 'Context is 85% full' })).toBeDefined()
+  expect(await band.find({ type: 'Text', text: 'Contexto 85% cheio' })).toBeDefined()
 })
 
 test('cards draw no background of their own', async ($, on) => {
@@ -1069,8 +1069,8 @@ test('/skin gallery opens a pane with every element, numbered, on both surfaces'
   for (const surface of SURFACES) {
     const ui = await $.ui.mount({ ...PANE, requestId: 'skins-gallery', surface })
 
-    expect(await ui.find({ type: 'Text', text: /^1  Your prompt/ })).toBeDefined()
-    expect(await ui.find({ type: 'Text', text: /^11  Turn footer/ })).toBeDefined()
+    expect(await ui.find({ type: 'Text', text: /^1  Seu prompt/ })).toBeDefined()
+    expect(await ui.find({ type: 'Text', text: /^11  Rodapé do turno/ })).toBeDefined()
     await ui.unmount()
   }
 })
@@ -1323,7 +1323,7 @@ test('quiet output folds a read-only call to its row, a failure to its error lin
   await runSkin($, 'quiet on')
 
   const grep = await $.ui.mount(toolUse(call('Grep', { pattern: 'TODO' })))
-  expect(await grep.find({ type: 'Text', text: /Searched/ })).toBeDefined()
+  expect(await grep.find({ type: 'Text', text: /Buscou/ })).toBeDefined()
   await grep.unmount()
 
   const quiet = await $.ui.mount(result(q1, 'Bash', { stdout: 'On branch main', stderr: '', interrupted: false }))
@@ -1365,7 +1365,7 @@ test('/skin copy copies the last reply and says so, or says there is nothing yet
   await runSkin($, 'copy')
   await runSkin($, 'copy code')
 
-  expect(toasts).toEqual(['Nothing to copy yet', 'Copied the reply', 'Copied the code'])
+  expect(toasts).toEqual(['Nada para copiar ainda', 'Resposta copiada', 'Código copiado'])
   expect(copied).toEqual([reply, 'pnpm build'])
 })
 
@@ -1401,7 +1401,7 @@ test('a session start says when a newer release is out, at most once a day', asy
 
   await $.session.start({ surface: 'terminal', isInteractive: true, cwd: '/work' })
   await unawaited()
-  expect(toasts.filter(text => text.startsWith('skins 0.1.3 is out'))).toHaveLength(1)
+  expect(toasts.filter(text => text.startsWith('pe-devkit 0.1.3 saiu'))).toHaveLength(1)
 
   latest = '0.1.4'
   await $.session.start({ surface: 'terminal', isInteractive: true, cwd: '/work' })
@@ -2121,7 +2121,7 @@ test('a failed shell call shows its exit code, and stderr under its own label in
   await closeRow($, id)
   await closeRow($, other)
   const record = await $.ui.mount(shellResult(id, { stdout: 'src/server.ts', stderr: 'error TS2322: Type string is not assignable to number', interrupted: false }, true))
-  expect(await record.find({ type: 'Text', text: '✗ failed' })).toBeDefined()
+  expect(await record.find({ type: 'Text', text: '✗ falhou' })).toBeDefined()
   expect(await record.find({ type: 'Text', text: 'stderr' })).toBeDefined()
   const err = (await record.find({ type: 'Text', text: 'error TS2322: Type string is not assignable to number' })) as Found
   expect(err?.props.color).toBe(palette.err)
@@ -2148,13 +2148,13 @@ test('long shell output folds to its head and tail on the terminal, each stream 
   expect(await ui.find({ type: 'Text', text: 'line 9' })).toBeUndefined()
   // The hidden run is a control that opens it, and `less` folds it again.
   const fold = async () => ((await ui.find({ key: 'fold-output' })) as { props: { label: string } } | undefined)?.props.label
-  expect(await fold()).toBe('▾ 28 more')
+  expect(await fold()).toBe('▾ mais 28')
   expect(await ui.find({ type: 'Text', text: 'line 37' })).toBeDefined()
   expect(await ui.find({ type: 'Text', text: 'line 40' })).toBeDefined()
   expect(await ui.find({ type: 'Text', text: 'warn: slow disk' })).toBeDefined()
   await ui.press({ key: 'fold-output' })
   expect(await ui.find({ type: 'Text', text: 'line 20' })).toBeDefined()
-  expect(await fold()).toBe('▴ less')
+  expect(await fold()).toBe('▴ menos')
   await ui.press({ key: 'fold-output' })
   expect(await ui.find({ type: 'Text', text: 'line 20' })).toBeUndefined()
 
@@ -2212,7 +2212,7 @@ test('/skin calm stills the spinner, drops the rail, folds read-only output and 
   const stderr = Array.from({ length: 30 }, (_, i) => `error ${i + 1}`).join('\n')
   await closeRow($, look)
   const failed = await $.ui.mount(shellResult(look, { stdout: '', stderr, interrupted: false }, true))
-  expect(await failed.find({ type: 'Text', text: '✗ failed' })).toBeDefined()
+  expect(await failed.find({ type: 'Text', text: '✗ falhou' })).toBeDefined()
   expect(await failed.find({ type: 'Text', text: 'error 15' })).toBeDefined()
   expect(await failed.find({ type: 'Text', text: /lines hidden/ })).toBeUndefined()
   await failed.unmount()

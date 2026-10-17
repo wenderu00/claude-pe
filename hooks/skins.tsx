@@ -446,19 +446,19 @@ async function runFolderCommand($: EngineInterface, word: string): Promise<strin
       await $.store.set('folders', withFolder(folders, folder, prefs))
       await update($, pinnedAtom, () => true)
 
-      return 'this folder keeps its own look'
+      return 'esta pasta tem o próprio visual'
     case 'unpin': {
       const fallback = parsePrefs(await $.store.get('prefs'), names)
       await $.store.set('folders', withoutFolder(folders, folder))
       await update($, pinnedAtom, () => false)
       await update($, prefsAtom, () => fallback)
 
-      return `this folder follows the default: ${fallback.skin}`
+      return `esta pasta segue o padrão: ${fallback.skin}`
     }
     default:
       await $.store.set('prefs', prefs)
 
-      return `default look: ${prefs.skin}`
+      return `visual padrão: ${prefs.skin}`
   }
 }
 
@@ -584,7 +584,7 @@ let lastColumns: number | undefined
 export async function skinsSessionStart($: EngineInterface, e: PartEvent<'session.start'>, next: PartNext<'session.start'>): PartResult<'session.start'> {
   await $.command.register({
     name: 'skin',
-    description: 'Open the skin settings, or /skin <name | list | off>',
+    description: 'Abre as configurações da skin, ou /skin <nome | list | off>',
     argumentHint: '[gallery | copy | copy code | name | list | off | calm | pin | unpin | share | rail | tables | shimmer | band | countdown | clip | markdown | quiet | charts | math | commands | shell | highlight | hints | links | fold | expand | compact | icons | prompt | words]',
     immediate: true,
   })
@@ -709,7 +709,7 @@ export async function skinsAbovePrompt($: EngineInterface, e: AbovePromptEvent, 
     $.clock.after(1, () =>
       $.command
         .run({ command: 'compact' })
-        .catch((error: unknown) => $.ui.toast(`Compacting failed: ${error instanceof Error ? error.message : String(error)}`))
+        .catch((error: unknown) => $.ui.toast(`A compactação falhou: ${error instanceof Error ? error.message : String(error)}`))
         .finally(() => update($, compactingAtom, () => false)),
     )
   }
@@ -791,13 +791,13 @@ export const register = (on: On): void => {
 
   on('command.run', { command: 'skin' }, async ($, e) => {
     if (e.args.trim() === '') {
-      await $.ui.open({ id: SETTINGS, title: 'Skins', focus: true, closeOnEscape: true })
+      await $.ui.open({ id: SETTINGS, title: 'Skin', focus: true, closeOnEscape: true })
 
       return {}
     }
 
     if (e.args.trim().toLowerCase() === 'gallery') {
-      await $.ui.open({ id: GALLERY, title: 'Skin gallery', focus: true, closeOnEscape: true })
+      await $.ui.open({ id: GALLERY, title: 'Galeria da skin', focus: true, closeOnEscape: true })
 
       return {}
     }
@@ -811,7 +811,7 @@ export const register = (on: On): void => {
         $.ui.toast(copied.message)
       } else {
         const result = await $.ui.copy({ text: copied.text })
-        $.ui.toast(result.isCopied ? (word === 'copy' ? 'Copied the reply' : 'Copied the code') : 'Could not copy here')
+        $.ui.toast(result.isCopied ? (word === 'copy' ? 'Resposta copiada' : 'Código copiado') : 'Não foi possível copiar aqui')
       }
 
       return {}
@@ -835,7 +835,7 @@ export const register = (on: On): void => {
       const width = lastColumns === undefined ? '' : `
 reply width: ${lastColumns} columns`
 
-      const folder = (await read($, pinnedAtom)) ? 'this folder: pinned' : 'this folder: follows the default'
+      const folder = (await read($, pinnedAtom)) ? 'esta pasta: fixada' : 'esta pasta: segue o padrão'
 
       return { text: e.args.trim() === 'list' ? `${outcome.message}\n${folder}${width}` : outcome.message }
     }
@@ -915,7 +915,7 @@ reply width: ${lastColumns} columns`
       ...(diff === null ? {} : diff),
     }
     const copy = (text: string) => {
-      void $.ui.copy({ text, surface: e.surface }).then(result => $.ui.toast(result.isCopied ? 'Copied' : 'Could not copy here'))
+      void $.ui.copy({ text, surface: e.surface }).then(result => $.ui.toast(result.isCopied ? 'Copiado' : 'Não foi possível copiar aqui'))
     }
     const fields = (e.props.input ?? {}) as { file_path?: unknown; notebook_path?: unknown }
     const path = fields.file_path ?? fields.notebook_path
@@ -989,7 +989,7 @@ reply width: ${lastColumns} columns`
     const active = await activeSkin($)
     const output = e.props.output as { stdout?: unknown } | null
     const copy = (text: string) => {
-      void $.ui.copy({ text, surface: e.surface }).then(result => $.ui.toast(result.isCopied ? 'Copied' : 'Could not copy here'))
+      void $.ui.copy({ text, surface: e.surface }).then(result => $.ui.toast(result.isCopied ? 'Copiado' : 'Não foi possível copiar aqui'))
     }
     // Only the terminal's shell card has a fold control here.
     const needs = { folds: e.surface === 'terminal' && SHELLS.has(e.props.tool) }
@@ -1120,7 +1120,7 @@ reply width: ${lastColumns} columns`
     const svg = e.surface !== 'terminal' && active.prefs.tables === 'on' && 'Svg' in ui ? ui.Svg : undefined
     lastColumns = e.viewport?.columns
     const copy = (copied: string) => {
-      void $.ui.copy({ text: copied, surface: e.surface }).then(result => $.ui.toast(result.isCopied ? 'Copied' : 'Could not copy here'))
+      void $.ui.copy({ text: copied, surface: e.surface }).then(result => $.ui.toast(result.isCopied ? 'Copiado' : 'Não foi possível copiar aqui'))
     }
 
     const base = await sessionLook($, e, lookOf(ui, active, e.surface, copy), replyNeeds(text, segments))
@@ -1149,7 +1149,7 @@ reply width: ${lastColumns} columns`
     const ui = $.ui.resolve(e)
     const svg = e.surface !== 'terminal' && active.prefs.tables === 'on' && 'Svg' in ui ? ui.Svg : undefined
     const copy = (copied: string) => {
-      void $.ui.copy({ text: copied, surface: e.surface }).then(result => $.ui.toast(result.isCopied ? 'Copied' : 'Could not copy here'))
+      void $.ui.copy({ text: copied, surface: e.surface }).then(result => $.ui.toast(result.isCopied ? 'Copiado' : 'Não foi possível copiar aqui'))
     }
 
     const base = await sessionLook($, e, lookOf(ui, active, e.surface, copy), replyNeeds(e.props.text, segments))

@@ -178,7 +178,7 @@ test('tables are on, text or off, and a stored on/off from before still reads', 
   expect(parsePrefs({ tables: 'text' }, NAMES).tables).toBe('text')
   expect(parsePrefs({ tables: 'grid' }, NAMES).tables).toBe('on')
   expect(runSkinCommand('tables text', DEFAULT_PREFS, NAMES).prefs.tables).toBe('text')
-  expect(runSkinCommand('tables maybe', DEFAULT_PREFS, NAMES).message).toBe('usage: /skin tables on|text|off')
+  expect(runSkinCommand('tables maybe', DEFAULT_PREFS, NAMES).message).toBe('uso: /skin tables on|text|off')
   expect(runSkinCommand('list', { ...DEFAULT_PREFS, tables: 'text' }, NAMES).message).toContain('tables text')
 })
 
@@ -191,7 +191,7 @@ test('the prompt sits left, right or plain, and anything else stored reads as le
   expect(runSkinCommand('prompt right', DEFAULT_PREFS, NAMES).prefs.prompt).toBe('right')
   expect(runSkinCommand('prompt left', { ...DEFAULT_PREFS, prompt: 'right' }, NAMES).prefs.prompt).toBe('left')
   expect(runSkinCommand('prompt plain', DEFAULT_PREFS, NAMES).prefs.prompt).toBe('plain')
-  expect(runSkinCommand('prompt up', DEFAULT_PREFS, NAMES).message).toBe('usage: /skin prompt left|right|plain')
+  expect(runSkinCommand('prompt up', DEFAULT_PREFS, NAMES).message).toBe('uso: /skin prompt left|right|plain')
   expect(runSkinCommand('list', { ...DEFAULT_PREFS, prompt: 'right' }, NAMES).message).toContain('prompt right')
 })
 
@@ -203,7 +203,7 @@ test('words are the skin’s or Claude Code’s, and anything else stored reads 
   expect(parsePrefs({}, NAMES).words).toBe('skin')
   expect(runSkinCommand('words claude', DEFAULT_PREFS, NAMES).prefs.words).toBe('claude')
   expect(runSkinCommand('words skin', { ...DEFAULT_PREFS, words: 'claude' }, NAMES).prefs.words).toBe('skin')
-  expect(runSkinCommand('words mine', DEFAULT_PREFS, NAMES).message).toBe('usage: /skin words claude|skin')
+  expect(runSkinCommand('words mine', DEFAULT_PREFS, NAMES).message).toBe('uso: /skin words claude|skin')
   expect(runSkinCommand('words', DEFAULT_PREFS, NAMES).prefs.words).toBe('skin')
   expect(runSkinCommand('list', { ...DEFAULT_PREFS, words: 'claude' }, NAMES).message).toContain('words claude')
 })
@@ -215,7 +215,7 @@ test('expand opens every tool group, is off by default, and anything but a boole
   expect(parsePrefs({}, NAMES).expand).toBe(false)
   expect(runSkinCommand('expand on', DEFAULT_PREFS, NAMES).prefs.expand).toBe(true)
   expect(runSkinCommand('expand off', { ...DEFAULT_PREFS, expand: true }, NAMES).prefs.expand).toBe(false)
-  expect(runSkinCommand('expand maybe', DEFAULT_PREFS, NAMES).message).toBe('usage: /skin expand on|off')
+  expect(runSkinCommand('expand maybe', DEFAULT_PREFS, NAMES).message).toBe('uso: /skin expand on|off')
   expect(runSkinCommand('list', { ...DEFAULT_PREFS, expand: true }, NAMES).message).toContain('expand on')
 })
 
@@ -226,7 +226,7 @@ test('compact keeps the band’s Compact button by default, and anything but a b
   expect(parsePrefs({}, NAMES).compact).toBe(true)
   expect(runSkinCommand('compact off', DEFAULT_PREFS, NAMES).prefs.compact).toBe(false)
   expect(runSkinCommand('compact on', { ...DEFAULT_PREFS, compact: false }, NAMES).prefs.compact).toBe(true)
-  expect(runSkinCommand('compact maybe', DEFAULT_PREFS, NAMES).message).toBe('usage: /skin compact on|off')
+  expect(runSkinCommand('compact maybe', DEFAULT_PREFS, NAMES).message).toBe('uso: /skin compact on|off')
   expect(runSkinCommand('list', { ...DEFAULT_PREFS, compact: false }, NAMES).message).toContain('compact off')
 })
 
@@ -310,7 +310,7 @@ test('plan limits read as 5h and 7d, and a meter warns as it fills', async () =>
   expect(limitLabel('five_hour')).toBe('5h')
   expect(limitLabel('seven_day')).toBe('7d')
   expect(metersOf({ context: 42.4, limits: [{ label: '5h', percent: 120 }] })).toEqual([
-    { label: 'context', percent: 42 },
+    { label: 'contexto', percent: 42 },
     { label: '5h', percent: 100 },
   ])
   expect(meterColor(85, tokyoNight.palette)).toBe(tokyoNight.palette.warn)
@@ -530,7 +530,7 @@ test('/skin copy takes the whole reply, or with code its last code block', async
   expect(copyOf(reply, false)).toEqual({ text: reply })
   expect(copyOf(reply, true)).toEqual({ text: 'pnpm build' })
   expect(copyOf('No code here.', true)).toEqual({ message: 'No code block in the last reply' })
-  expect(copyOf('  \n', false)).toEqual({ message: 'Nothing to copy yet' })
+  expect(copyOf('  \n', false)).toEqual({ message: 'Nada para copiar ainda' })
 })
 
 test('a Mermaid flowchart parses into ranked nodes, shapes and labelled edges', async () => {
@@ -1043,7 +1043,7 @@ test('a release is newer by its first differing part, and anything not x.y.z nev
   expect(isNewer('0.1.2', '0.1.3')).toBe(false)
   expect(isNewer('1.0.0-beta', '0.1.2')).toBe(false)
   expect(isNewer('0.1.3', 'dev')).toBe(false)
-  expect(updateNotice('0.1.3', '0.1.2')).toBe('skins 0.1.3 is out (you have 0.1.2). Run: claude plugin update skins@hellosverre-mods, then restart')
+  expect(updateNotice('0.1.3', '0.1.2')).toBe('pe-devkit 0.1.3 saiu (você tem a 0.1.2). Rode: claude plugin update pe-devkit@pe-devkit, e reinicie')
 })
 
 test('the star ask comes once, three days after skins was first seen', () => {

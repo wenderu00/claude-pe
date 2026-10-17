@@ -30,7 +30,7 @@ export function shellRows(look: Look, command: string, result: ShellResult, isEr
       folds === undefined ? (
         <Text color={palette.muted}>{`… ${line.fold} lines hidden`}</Text>
       ) : (
-        <Button key={key} label={`${look.prefs.icons === 'ascii' ? 'v' : '▾'} ${line.fold} more`} plain dimColor onPress={() => folds.toggle(OUTPUT_FOLD)} />
+        <Button key={key} label={`${look.prefs.icons === 'ascii' ? 'v' : '▾'} mais ${line.fold}`} plain dimColor onPress={() => folds.toggle(OUTPUT_FOLD)} />
       )
     ) : look.prefs.highlight && !line.isErr && line.text !== '' ? (
       outputLine(look, line.text)
@@ -62,7 +62,7 @@ export function shellRows(look: Look, command: string, result: ShellResult, isEr
       {lines.stderr.length > 0 && lines.stdout.length > 0 ? <Text color={palette.muted}>stderr</Text> : ''}
       {fold(lines.stderr, at.stderr).map(line => row(line, `${OUTPUT_FOLD}-err`))}
       {folds?.open.has(OUTPUT_FOLD) === true && Math.max(lines.stdout.length, lines.stderr.length) > FOLDS_PAST ? (
-        <Button key={OUTPUT_FOLD} label={`${look.prefs.icons === 'ascii' ? '^' : '▴'} less`} plain dimColor onPress={() => folds.toggle(OUTPUT_FOLD)} />
+        <Button key={OUTPUT_FOLD} label={`${look.prefs.icons === 'ascii' ? '^' : '▴'} menos`} plain dimColor onPress={() => folds.toggle(OUTPUT_FOLD)} />
       ) : (
         ''
       )}

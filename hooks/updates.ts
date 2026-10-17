@@ -1,8 +1,8 @@
 // Whether an installed copy is behind. A release is the version bump on main, so main's
 // plugin.json is the latest. register.tsx does the fetching, since $ stays in that file.
-export const LATEST_URL = 'https://raw.githubusercontent.com/hellosverre/claude-skins/main/.claude-plugin/plugin.json'
+export const LATEST_URL = 'https://raw.githubusercontent.com/wenderu00/claude-pe/main/.claude-plugin/plugin.json'
 const DAY_MS = 24 * 60 * 60 * 1000
-const PLUGIN_ID = 'skins@hellosverre-mods'
+const PLUGIN_ID = 'pe-devkit@pe-devkit'
 
 export type Checked = { at: number }
 
@@ -34,7 +34,7 @@ export function isNewer(latest: string, current: string): boolean {
 }
 
 export const updateNotice = (latest: string, current: string): string =>
-  `skins ${latest} is out (you have ${current}). Run: claude plugin update ${PLUGIN_ID}, then restart`
+  `pe-devkit ${latest} saiu (você tem a ${current}). Rode: claude plugin update ${PLUGIN_ID}, e reinicie`
 
 export const isDue = (raw: unknown, now: number): boolean => {
   const at = typeof raw === 'object' && raw !== null ? (raw as Partial<Checked>).at : undefined
@@ -46,7 +46,7 @@ export const isDue = (raw: unknown, now: number): boolean => {
 // kept the skin rather than someone still trying it out.
 const STAR_AFTER_MS = 3 * DAY_MS
 
-export const STAR_NOTICE = 'Enjoying skins? A ★ on GitHub helps others find it: https://github.com/hellosverre/claude-skins'
+export const STAR_NOTICE = 'Gostando do pe-devkit? Uma ★ no GitHub ajuda outros devs a achar: https://github.com/wenderu00/claude-pe'
 
 export type Star = { since: number; asked: boolean }
 

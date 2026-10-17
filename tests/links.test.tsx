@@ -205,14 +205,14 @@ test('long code and tables fold behind ▾ N more on the terminal; fold off show
   const ui = await $.ui.mount(reply(`${code}\n\n${table}`))
   expect(await ui.find({ type: 'Text', text: 'const line24 = 24' })).toBeDefined()
   expect(await ui.find({ type: 'Text', text: 'const line25 = 25' })).toBeUndefined()
-  expect(await label(ui, 'fold-0')).toBe('▾ 6 more')
+  expect(await label(ui, 'fold-0')).toBe('▾ mais 6')
   expect(await ui.find({ type: 'Text', text: 'row14' })).toBeDefined()
   expect(await ui.find({ type: 'Text', text: 'row15' })).toBeUndefined()
-  expect(await label(ui, 'fold-1')).toBe('▾ 6 more')
+  expect(await label(ui, 'fold-1')).toBe('▾ mais 6')
 
   await ui.press({ key: 'fold-0' })
   expect(await ui.find({ type: 'Text', text: 'const line30 = 30' })).toBeDefined()
-  expect(await label(ui, 'fold-0')).toBe('▴ less')
+  expect(await label(ui, 'fold-0')).toBe('▴ menos')
   // The table stays folded: each block keeps its own state.
   expect(await ui.find({ type: 'Text', text: 'row15' })).toBeUndefined()
   await ui.unmount()

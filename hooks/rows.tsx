@@ -26,7 +26,7 @@ import { cardWidth, settled } from './svg-kit'
 import { tableSvg } from './svg-table'
 import { terminalSvg } from './svg-terminal'
 import type { ShellOutput } from './svg-terminal'
-import { metersKey, usageLine, usageSvg } from './svg-usage'
+import { CONTEXT_LABEL, metersKey, usageLine, usageSvg } from './svg-usage'
 import { codeRows } from './code-rows'
 import { languageOf } from './highlight'
 import type { Meter } from './svg-usage'
@@ -401,7 +401,7 @@ function cardWithCopy(look: Look, Svg: SvgElement, built: { source: string; alt:
         ''
       ) : (
         <Box position="absolute" top={1} right={3}>
-          <Button key={key} label="Copy" plain dimColor onPress={() => copy(text)} />
+          <Button key={key} label="Copiar" plain dimColor onPress={() => copy(text)} />
         </Box>
       )}
     </Box>
@@ -416,7 +416,7 @@ function tableCard(look: Look, table: Table, Svg: SvgElement, columns: number, k
   return (
     <Box flexDirection="column">
       {cardWithCopy(look, Svg, card, key, tableMarkdown(table))}
-      {copyRow(look, `${key}-art`, tableArt(table), 'Copy as text')}
+      {copyRow(look, `${key}-art`, tableArt(table), 'Copiar como texto')}
     </Box>
   )
 }
@@ -505,7 +505,7 @@ export function copyButton(look: Look, key: string, text: string, label = ' Copy
 }
 
 // A small Copy button under a card or block, flush right; nothing where nothing can copy.
-export function copyRow(look: Look, key: string, text: string, label = 'Copy') {
+export function copyRow(look: Look, key: string, text: string, label = 'Copiar') {
   const { Box, Button } = look.ui
   const copy = look.copy
 
@@ -927,7 +927,7 @@ function meterView(look: Look, meters: readonly Meter[]) {
 export function usageBand(look: Look, meters: readonly Meter[], canCompact: boolean, compact: () => void) {
   const { Box, Text, Button } = look.ui
   const { palette } = look.skin
-  const context = meters.find(meter => meter.label === 'context')?.percent ?? 0
+  const context = meters.find(meter => meter.label === CONTEXT_LABEL)?.percent ?? 0
   const isNudge = context >= COMPACT_NUDGE
 
   return (
@@ -936,13 +936,13 @@ export function usageBand(look: Look, meters: readonly Meter[], canCompact: bool
       <Box flexDirection="row" alignItems="center" columnGap={3} justifyContent="space-evenly" flexGrow={1}>
         {meterView(look, meters)}
       </Box>
-      {canCompact && isNudge ? <Text color={palette.warn}>{`Context is ${context}% full`}</Text> : ''}
+      {canCompact && isNudge ? <Text color={palette.warn}>{`Contexto ${context}% cheio`}</Text> : ''}
       {canCompact ? (
         // A digit hotkey: typed alone into an empty prompt it presses the band's button, which
         // is the only way in where the terminal reports no clicks. `plain` shows it: `0: Compact`.
         <Button
           key="compact"
-          label={isNudge ? 'Compact now' : 'Compact'}
+          label={isNudge ? 'Compactar agora' : 'Compactar'}
           hotkey={COMPACT_HOTKEY}
           plain
           {...(isNudge ? { variant: 'primary' as const } : { dimColor: true })}

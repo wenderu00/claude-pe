@@ -224,16 +224,16 @@ export function isQuiet(tool: string, input: unknown): boolean {
   return false
 }
 
-// The row's verb for a quiet call: `Read`, `Searched`, `Listed`, `Looked`.
+// The row's verb for a quiet call: `Read`, `Buscou`, `Listou`, `Consultou`.
 export function quietLabel(tool: string): string {
   switch (tool) {
     case 'Grep':
-      return 'Searched'
+      return 'Buscou'
     case 'Glob':
-      return 'Listed'
+      return 'Listou'
     case 'Bash':
     case 'PowerShell':
-      return 'Looked'
+      return 'Consultou'
     default:
       return tool
   }

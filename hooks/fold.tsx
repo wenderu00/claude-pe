@@ -1,6 +1,6 @@
 import type { Look } from './rows'
 
-// Long blocks fold to their first lines behind a `▾ N more` control; `▴ less` folds them
+// Long blocks fold to their first lines behind a `▾ mais N` control; `▴ menos` folds them
 // again. Which blocks the person opened lives in the drawing's `folds`.
 
 // Lines of code and rows of a table shown while folded.
@@ -23,7 +23,7 @@ export function foldButton(look: Look, key: string, count: number, limit: number
 
   const isOpen = folds.open.has(key)
   const ascii = look.prefs.icons === 'ascii'
-  const label = isOpen ? `${ascii ? '^' : '▴'} less` : `${ascii ? 'v' : '▾'} ${count - limit} more`
+  const label = isOpen ? `${ascii ? '^' : '▴'} menos` : `${ascii ? 'v' : '▾'} mais ${count - limit}`
 
   return (
     <Box flexDirection="row">

@@ -118,7 +118,7 @@ function searchBody(output: unknown, cwd: string): Body {
     const lines = clean(record.content).replace(/\n$/, '').split('\n')
     const numLines = typeof record.numLines === 'number' ? record.numLines : lines.length
 
-    return { kind: 'matches', lines: lines.map(line => shortenPath(line, cwd)), note: `${count(numLines, 'line')}${truncated}` }
+    return { kind: 'matches', lines: lines.map(line => shortenPath(line, cwd)), note: `${count(numLines, 'linha')}${truncated}` }
   }
 
   if (files.length === 0 && typeof record.numFiles !== 'number') {
@@ -127,7 +127,7 @@ function searchBody(output: unknown, cwd: string): Body {
 
   return files.length === 0
     ? { kind: 'none' }
-    : { kind: 'matches', lines: files.map(file => shortenPath(file, cwd)), note: `${count(files.length, 'file')}${truncated}` }
+    : { kind: 'matches', lines: files.map(file => shortenPath(file, cwd)), note: `${count(files.length, 'arquivo')}${truncated}` }
 }
 
 function webBody(tool: string, output: unknown): Body {

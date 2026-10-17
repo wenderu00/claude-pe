@@ -58,10 +58,13 @@ export function limitLabel(kind: string): string {
   return name.replace(/_/g, ' ')
 }
 
+// The context window's meter: its label, which the band also finds it by.
+export const CONTEXT_LABEL = 'contexto'
+
 // `countdowns`, by limit label, puts each limit's time to reset beside its meter.
 export function metersOf(usage: UsageSnap, countdowns: Record<string, string> = {}): Meter[] {
   return [
-    ...(usage.context === null ? [] : [{ label: 'context', percent: usage.context }]),
+    ...(usage.context === null ? [] : [{ label: CONTEXT_LABEL, percent: usage.context }]),
     ...usage.limits.map(limit => {
       const resets = countdowns[limit.label]
 

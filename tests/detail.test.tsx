@@ -99,7 +99,7 @@ test('a long Read folds past 20 lines behind show all, and show less folds it ag
   expect(folded?.props.source).not.toContain('line21 ')
   await ui.press({ key: 'show-all' })
   expect(((await ui.find({ type: 'Code' })) as CodeFound)?.props.source).toContain('line30 ')
-  expect(((await ui.find({ key: 'show-all' })) as { props: { label: string } } | undefined)?.props.label).toBe('show less')
+  expect(((await ui.find({ key: 'show-all' })) as { props: { label: string } } | undefined)?.props.label).toBe('mostrar menos')
 })
 
 test('an opened Grep shows its pattern, glob and the matching lines or files', async ($, on) => {
@@ -109,12 +109,12 @@ test('an opened Grep shows its pattern, glob and the matching lines or files', a
   expect(await content.find({ type: 'Text', text: /pattern {2}TODO/ })).toBeDefined()
   expect(await content.find({ type: 'Text', text: /glob {2}\*\.ts/ })).toBeDefined()
   expect(await content.find({ type: 'Text', text: 'src/a.ts:9:// TODO test' })).toBeDefined()
-  expect(await content.find({ type: 'Text', text: '2 lines' })).toBeDefined()
+  expect(await content.find({ type: 'Text', text: '2 linhas' })).toBeDefined()
   await content.unmount()
 
   const files = await opened($, call('g2', 'Glob', { pattern: '**/*.md' }, { filenames: ['/work/README.md', '/work/docs/compat.md'], numFiles: 2, truncated: false }))
   expect(await files.find({ type: 'Text', text: 'docs/compat.md' })).toBeDefined()
-  expect(await files.find({ type: 'Text', text: '2 files' })).toBeDefined()
+  expect(await files.find({ type: 'Text', text: '2 arquivos' })).toBeDefined()
 })
 
 test('an opened PowerShell call shows its command and output as the shell card', async ($, on) => {

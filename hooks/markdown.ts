@@ -358,7 +358,7 @@ export function padCell(text: string, width: number, align: Align): string {
 // block; a message instead when there is nothing to copy.
 export function copyOf(reply: string, code: boolean): { text: string } | { message: string } {
   if (reply.trim() === '') {
-    return { message: 'Nothing to copy yet' }
+    return { message: 'Nada para copiar ainda' }
   }
 
   if (!code) {

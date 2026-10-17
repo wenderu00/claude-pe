@@ -69,15 +69,15 @@ export function foldLines<T>(lines: readonly T[], head: number, tail: number): F
 // How the call ended, worst first; an exit code only where the call reported one.
 export function shellStatus(result: ShellResult, isErrored: boolean, ascii: boolean): ShellStatus {
   if (result.interrupted) {
-    return { tone: 'warn', text: 'interrupted' }
+    return { tone: 'warn', text: 'interrompido' }
   }
 
   if (result.timedOutAfterMs !== undefined) {
-    return { tone: 'warn', text: 'timed out' }
+    return { tone: 'warn', text: 'tempo esgotado' }
   }
 
   if (isErrored) {
-    return { tone: 'err', text: `${ascii ? 'x' : '✗'} ${result.exitCode === undefined ? 'failed' : `exit ${result.exitCode}`}` }
+    return { tone: 'err', text: `${ascii ? 'x' : '✗'} ${result.exitCode === undefined ? 'falhou' : `exit ${result.exitCode}`}` }
   }
 
   const note = result.returnCodeInterpretation === undefined ? '' : ` ${result.returnCodeInterpretation}`

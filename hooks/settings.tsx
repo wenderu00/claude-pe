@@ -29,7 +29,7 @@ export type SettingsActions = {
 
 const SAMPLE: Table = {
   kind: 'table',
-  header: ['Route', 'Limit', 'Window'],
+  header: ['Rota', 'Limite', 'Janela'],
   align: ['left', 'right', 'left'],
   rows: [
     ['/chat', '60', '1 min'],
@@ -43,11 +43,11 @@ const done = { isRunning: false, isErrored: false, isInterrupted: false }
 // A turn as the skin would draw it, built from the same rows the transcript uses.
 function preview(look: Look, width: number) {
   const { Box } = look.ui
-  const word = look.skin.done[0] ?? 'Done'
+  const word = look.skin.done[0] ?? 'Pronto'
 
   return (
     <Box flexDirection="column" borderStyle="round" borderColor={look.skin.palette.muted} paddingX={1}>
-      {promptRow(look, 'add rate limiting to the hub api')}
+      {promptRow(look, 'adicionar limite de requisições na API do hub')}
       {toolRow(look, { tool: 'Bash', input: {}, ...done }, 'run', 'pnpm test --filter hub', { ms: 2140 })}
       {toolRow(look, { tool: 'Edit', input: {}, ...done }, 'write', 'apps/hub/src/server.ts', {
         ms: 380,
@@ -101,7 +101,7 @@ export function settingsPane(look: Look, ui: PaneUi, model: SettingsModel, actio
       {preview(look, model.width)}
 
       <Box flexDirection="row" flexWrap="wrap" columnGap={2}>
-        <Text color={palette.muted}>Look</Text>
+        <Text color={palette.muted}>Visual</Text>
         {toggle('rail', 'r', prefs.rail)}
         <Button
           key="tables"
@@ -148,7 +148,7 @@ export function settingsPane(look: Look, ui: PaneUi, model: SettingsModel, actio
         <Box flexDirection="row" columnGap={2} marginTop={1}>
           <Select
             key="slot"
-            label="Colour"
+            label="Cor"
             value={model.editing}
             options={SLOTS.map(slot => ({ value: slot, label: slot }))}
             onSelect={(value: string) => actions.edit(value as SkinSlot)}
@@ -158,14 +158,14 @@ export function settingsPane(look: Look, ui: PaneUi, model: SettingsModel, actio
             label={palette[model.editing]}
             placeholder="#rrggbb"
             value=""
-            submitLabel="paint"
+            submitLabel="pintar"
             onSubmit={(value: string) => actions.paint(value.trim())}
           />
         </Box>
       </Box>
 
       <Text color={palette.muted}>
-        Or ask Claude: <Text color={palette.fg}>“make me a skin that feels like a sunset”</Text>. Esc closes.
+        Esc fecha.
       </Text>
     </Box>
   )

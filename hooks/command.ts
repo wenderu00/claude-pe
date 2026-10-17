@@ -182,7 +182,7 @@ export function runSkinCommand(args: string, current: Prefs, names: readonly str
 
     return value === 'on' || value === 'off'
       ? changed({ ...current, [field]: value === 'on' }, `${head} ${value}`)
-      : refused(current, `usage: /skin ${head} on|off`)
+      : refused(current, `uso: /skin ${head} on|off`)
   }
 
   switch (head) {
@@ -192,36 +192,36 @@ export function runSkinCommand(args: string, current: Prefs, names: readonly str
     case 'off':
     case 'default':
     case 'stock':
-      return changed({ ...current, skin: 'off' }, 'skins off')
+      return changed({ ...current, skin: 'off' }, 'skin desligada')
     case 'on':
       return current.skin === 'off'
         ? changed({ ...current, skin: DEFAULT_PREFS.skin }, `skin: ${DEFAULT_PREFS.skin}`)
         : changed(current, `skin: ${current.skin}`)
     case 'calm':
       return value === 'on' || value === undefined
-        ? changed(withCalm(current, true), current.calm === null ? 'calm on' : 'calm is already on')
+        ? changed(withCalm(current, true), current.calm === null ? 'calm on' : 'calm já está ligado')
         : value === 'off'
-          ? changed(withCalm(current, false), current.calm === null ? 'calm is already off' : 'calm off: your settings are back')
-          : refused(current, 'usage: /skin calm [on|off]')
+          ? changed(withCalm(current, false), current.calm === null ? 'calm já está desligado' : 'calm off: suas configurações voltaram')
+          : refused(current, 'uso: /skin calm [on|off]')
     case 'tables':
       return value === 'on' || value === 'text' || value === 'off'
         ? changed({ ...current, tables: value }, `tables ${value}`)
-        : refused(current, 'usage: /skin tables on|text|off')
+        : refused(current, 'uso: /skin tables on|text|off')
     case 'prompt':
       return value === 'left' || value === 'right' || value === 'plain'
         ? changed({ ...current, prompt: value }, `prompt ${value}`)
-        : refused(current, 'usage: /skin prompt left|right|plain')
+        : refused(current, 'uso: /skin prompt left|right|plain')
     case 'words':
       return value === 'claude' || value === 'skin'
         ? changed({ ...current, words: value }, `words: ${value}`)
-        : refused(current, 'usage: /skin words claude|skin')
+        : refused(current, 'uso: /skin words claude|skin')
     case 'icons':
       return value === 'unicode' || value === 'ascii'
         ? changed({ ...current, icons: value }, `icons: ${value}`)
-        : refused(current, 'usage: /skin icons unicode|ascii')
+        : refused(current, 'uso: /skin icons unicode|ascii')
     default:
       return names.includes(head)
         ? changed({ ...current, skin: head }, `skin: ${head}`)
-        : refused(current, `unknown skin "${head}". /skin list shows them`)
+        : refused(current, `skin "${head}" desconhecida. /skin list mostra as skins`)
   }
 }

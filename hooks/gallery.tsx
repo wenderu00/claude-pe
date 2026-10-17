@@ -64,49 +64,49 @@ export function galleryPane(look: Look, columns: number) {
 
   return (
     <Box flexDirection="column">
-      {section('Your prompt', promptRow(look, 'add rate limiting to the hub api'))}
+      {section('Seu prompt', promptRow(look, 'add rate limiting to the hub api'))}
       {section(
-        'Tool rows: finished, running, failed',
+        'Linhas de ferramenta: concluída, rodando, com falha',
         toolRow(look, { tool: 'Bash', input: {}, ...done }, 'run', 'pnpm test --filter hub', { ms: 2140 }),
         toolRow(look, { tool: 'Read', input: {}, ...done, isRunning: true }, 'read', 'docs/protocols.md', {}),
         toolRow(look, { tool: 'Edit', input: {}, ...done, isErrored: true }, 'write', 'apps/hub/src/server.ts', {}),
       )}
-      {section('Folded group of reads and searches', groupRow(look, [{ tool: 'Read', input: {}, ...done }, { tool: 'Read', input: {}, ...done }, { tool: 'Grep', input: {}, ...done }]))}
+      {section('Grupo recolhido de leituras e buscas', groupRow(look, [{ tool: 'Read', input: {}, ...done }, { tool: 'Read', input: {}, ...done }, { tool: 'Grep', input: {}, ...done }]))}
       {svg === undefined
-        ? section('Edit diff card', <Text color={palette.muted}>Desktop only; the terminal keeps Claude Code's diff.</Text>)
-        : section('Edit diff card', diffCard(look, svg, DIFF, 'apps/hub/src/server.ts', width))}
+        ? section('Cartão de diff da edição', <Text color={palette.muted}>Desktop only; the terminal keeps Claude Code's diff.</Text>)
+        : section('Cartão de diff da edição', diffCard(look, svg, DIFF, 'apps/hub/src/server.ts', width))}
       {svg === undefined
         ? section(
-            'Shell output card: ok, failed with stderr, folded',
+            'Cartão de saída do shell: ok, falha com stderr, recolhido',
             shellRows(look, 'pnpm test --filter hub', { stdout: 'Test Files  12 passed (12)\n     Tests  148 passed (148)', stderr: '', interrupted: false }, false, SHELL_FOLD),
             shellRows(look, 'pnpm tsc', { stdout: 'src/server.ts', stderr: 'error TS2322: Type string is not assignable to number', interrupted: false, exitCode: 2 }, true, SHELL_FOLD),
             shellRows(look, 'seq 40', { stdout: Array.from({ length: 40 }, (_, i) => String(i + 1)).join('\n'), stderr: '', interrupted: false }, false, SHELL_FOLD),
           )
         : section(
-            'Shell output card: ok, failed',
+            'Cartão de saída do shell: ok, falha',
             terminalCard(look, svg, { stdout: 'Test Files  12 passed (12)\n     Tests  148 passed (148)', stderr: '', interrupted: false }, false, width),
             terminalCard(look, svg, { stdout: '', stderr: 'error TS2322: Type string is not assignable to number', interrupted: false }, true, width, 'copy-output-failed'),
           )}
       {svg === undefined
-        ? section('Code block, highlighted', codeRows(look, 'ts', CODE))
-        : section('Code block card', codeCard(look, 'ts', CODE, svg, width))}
-      {section('Table', replyRows(look, [TABLE], width, svg))}
+        ? section('Bloco de código, destacado', codeRows(look, 'ts', CODE))
+        : section('Cartão de bloco de código', codeCard(look, 'ts', CODE, svg, width))}
+      {section('Tabela', replyRows(look, [TABLE], width, svg))}
       {svg === undefined
-        ? section('Spinner', spinnerRow(look, look.skin.spinner[0] ?? 'Working', 3, 12_000))
+        ? section('Indicador de progresso', spinnerRow(look, look.skin.spinner[0] ?? 'Working', 3, 12_000))
         : section(
             'Spinner: thinking, tool running, writing, waiting',
             desktopSpinnerRow(look, svg, 'thinking', 'Thinking'),
-            desktopSpinnerRow(look, svg, 'tool-use', 'Running pnpm test'),
-            desktopSpinnerRow(look, svg, 'responding', 'Writing the reply'),
-            desktopSpinnerRow(look, svg, 'requesting', 'Waiting for the model'),
+            desktopSpinnerRow(look, svg, 'tool-use', 'Rodando pnpm test'),
+            desktopSpinnerRow(look, svg, 'responding', 'Escrevendo a resposta'),
+            desktopSpinnerRow(look, svg, 'requesting', 'Esperando o modelo'),
           )}
       {section(
-        'Band above the prompt: normal, then nudging to compact',
-        usageBand(look, [{ label: 'context', percent: 42 }, { label: '5h', percent: 18 }], look.prefs.compact, () => undefined),
-        usageBand(look, [{ label: 'context', percent: 85 }, { label: '5h', percent: 61 }], look.prefs.compact, () => undefined),
+        'Faixa acima do prompt: normal, e depois sugerindo compactar',
+        usageBand(look, [{ label: 'contexto', percent: 42 }, { label: '5h', percent: 18 }], look.prefs.compact, () => undefined),
+        usageBand(look, [{ label: 'contexto', percent: 85 }, { label: '5h', percent: 61 }], look.prefs.compact, () => undefined),
       )}
-      {section('Band above a question', askBand(look, ['Approach', 'Store']))}
-      {section('Turn footer (terminal)', footerRow(look, look.skin.done[0] ?? 'Done', 41_000, { tools: 6, added: 18, removed: 3 }))}
+      {section('Faixa acima de uma pergunta', askBand(look, ['Approach', 'Store']))}
+      {section('Rodapé do turno (terminal)', footerRow(look, look.skin.done[0] ?? 'Pronto', 41_000, { tools: 6, added: 18, removed: 3 }))}
     </Box>
   )
 }
