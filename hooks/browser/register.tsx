@@ -80,8 +80,8 @@ async function startBridge($: EngineInterface): Promise<{ ok: true } | { ok: fal
     return {
       ok: false,
       error: check.installed
-        ? 'Newer terminal-browser version required, run terminal-browser upgrade'
-        : `Please install terminal-browser first - ${INSTALL_URL}`,
+        ? 'É preciso uma versão mais nova do terminal-browser: rode terminal-browser upgrade'
+        : `Instale o terminal-browser primeiro: ${INSTALL_URL}`,
     }
   }
   let report: unknown = null
@@ -93,7 +93,7 @@ async function startBridge($: EngineInterface): Promise<{ ok: true } | { ok: fal
     report = { error: String(err), code: 'start' }
   }
   if (!isLaunchReport(report) || !('port' in report)) {
-    const detail = isLaunchReport(report) && 'error' in report ? report.error : 'terminal-browser could not start'
+    const detail = isLaunchReport(report) && 'error' in report ? report.error : 'o terminal-browser não iniciou'
     return { ok: false, error: `${detail}` }
   }
   state.port = report.port
@@ -207,7 +207,7 @@ async function openBrowser($: EngineInterface, raw: string | null): Promise<{ ok
   const url = raw ? normalizeUrl(raw) : (alive && state.last?.url ? state.last.url : START_URL)
   state.pendingUrl = url
   state.open = true
-  await $.ui.open({ id: PANE, title: 'browser', focus: true, rows: 24 })
+  await $.ui.open({ id: PANE, title: 'navegador', focus: true, rows: 24 })
   $.ui.invalidate('ui.render')
   if (state.region) {
     state.pendingUrl = null
@@ -260,7 +260,7 @@ export async function browserSessionStart($: EngineInterface, e: PartEvent<'sess
   if (!surfaces.includes('terminal')) return r
   await $.command.register({
     name: 'browser',
-    description: 'Open a browser to the right',
+    description: 'Abre um navegador à direita',
     argumentHint: '[url]',
     immediate: true,
   }).catch(err => $.ui.log(`terminal-browser: /browser not registered: ${err}`))
@@ -308,10 +308,10 @@ export const register = (on: On, options: PluginOptions): void => {
     const arg = e.args.trim()
     if (arg === 'close' || (!arg && state.open)) {
       await closeBrowser($)
-      return { text: 'Closed terminal-browser' }
+      return { text: 'Navegador fechado.' }
     }
     const opened = await openBrowser($, arg || null)
-    return { text: opened.ok ? 'Opened terminal-browser' : opened.error }
+    return { text: opened.ok ? 'Navegador aberto.' : opened.error }
   })
 
   on('tool.call', { tool: new RegExp(`^${OPEN_TOOL}$`) }, async ($, e) => {

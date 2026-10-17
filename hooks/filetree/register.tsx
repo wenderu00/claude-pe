@@ -200,7 +200,7 @@ async function list($: EngineInterface, dir: string): Promise<FileNode[] | null>
     if (!(await exists($, dir))) return []
     if (!unreadable.has(dir)) {
       unreadable.add(dir)
-      $.ui.toast(`could not list ${shortPath(dir)}: ${err instanceof Error ? err.message : String(err)}`)
+      $.ui.toast(`não foi possível listar ${shortPath(dir)}: ${err instanceof Error ? err.message : String(err)}`)
     }
     return null
   }
@@ -301,7 +301,7 @@ async function reset($: EngineInterface, root: string, focus = false): Promise<v
   sizeEpoch += 1
   sizeQueue = []
   await put($, () => ({ ...emptyTree(root), showHidden: prev.showHidden, showSize: prev.root ? prev.showSize : sizeDefault }))
-  const title = `Files: ${root.split('/').pop() || root}`
+  const title = `Arquivos: ${root.split('/').pop() || root}`
   if (focus) await $.ui.open({ id: PANE, title, focus: true })
   else if (!noDock) await $.ui.open({ id: PANE, title })
   await loadDirs($, [root])
@@ -583,11 +583,11 @@ async function outcomes($: EngineInterface, p: Pending, ok: boolean, op: GitOper
   return p.actions.map(a => {
     if (a.verb === 'commit') {
       const sha = op?.commit?.sha || (after && after !== p.head ? after : '')
-      return sha ? { state: 'done', label: a.done, detail: sha.slice(0, 7) } : { state: 'failed', label: `${a.verb} failed`, detail: '' }
+      return sha ? { state: 'done', label: a.done, detail: sha.slice(0, 7) } : { state: 'failed', label: `${a.verb} falhou`, detail: '' }
     }
     if ((op && PROOF[a.verb]?.(op)) || (ok && chain.and)) return { state: 'done', label: a.done, detail: '' }
-    if (!ok && chain.and && chain.size === 1) return { state: 'failed', label: `${a.verb} failed`, detail: '' }
-    return { state: 'done', label: `ran ${a.kind}`, detail: '' }
+    if (!ok && chain.and && chain.size === 1) return { state: 'failed', label: `${a.verb} falhou`, detail: '' }
+    return { state: 'done', label: `executou ${a.kind}`, detail: '' }
   })
 }
 
@@ -604,7 +604,7 @@ async function finishGit($: EngineInterface, p: Pending, results: Outcome[]): Pr
 }
 
 function failAll(p: Pending): Outcome[] {
-  return p.actions.map(a => ({ state: 'failed', label: `${a.verb} failed`, detail: '' }))
+  return p.actions.map(a => ({ state: 'failed', label: `${a.verb} falhou`, detail: '' }))
 }
 
 function proven(p: Pending | null, results: Outcome[]): GitAction[] {
@@ -679,7 +679,7 @@ async function copyPath($: EngineInterface, id: string, absolute: boolean, surfa
   const t = await get($)
   const text = !absolute && id !== t.root && inside(t.root, id) ? id.slice(t.root.endsWith('/') ? t.root.length : t.root.length + 1) : id
   const done = await $.ui.copy({ text, ...(surface ? { surface: surface as 'terminal' } : {}) })
-  $.ui.toast(done.isCopied ? `Copied ${text}` : 'Could not copy the path')
+  $.ui.toast(done.isCopied ? `Copiado: ${text}` : 'Não foi possível copiar o caminho')
 }
 
 async function exists($: EngineInterface, path: string): Promise<boolean> {
@@ -989,7 +989,7 @@ async function openFile($: EngineInterface, path: string, how: { mode?: string; 
   if (mode === 'preview') return showPreview($, path)
   const os = await osName($)
   if (mode === 'editor' && (os === 'win32' || !(await $.env.get('TMUX')))) {
-    $.ui.toast('Open with: editor requires tmux on Linux or macOS. Clear Open with to use the default app, or set a custom command.')
+    $.ui.toast('Abrir arquivo com: editor exige tmux no Linux ou macOS. Deixe a opção vazia para usar o app padrão, ou defina um comando.')
     return
   }
   const native = (p: string) => (os === 'win32' ? p.replace(/\//g, '\\') : p)
@@ -998,9 +998,9 @@ async function openFile($: EngineInterface, path: string, how: { mode?: string; 
   try {
     const { argv, init } = editor ? tmuxOpenCommand(editor, path, how.line) : custom ? { argv: os === 'linux' ? ['sh', '-c', LINUX_LAUNCH, 'sh', ...custom] : custom, init: { timeoutMs: 10_000 } } : openCommand(os, path)
     const run = await $.process.run(argv, init)
-    if (run.exitCode !== 0) $.ui.toast(`could not open ${path} with ${editor ?? custom?.[0] ?? argv[0]}: ${run.stderr.trim().split('\n')[0] || `exit ${run.exitCode}`}`)
+    if (run.exitCode !== 0) $.ui.toast(`não foi possível abrir ${path} com ${editor ?? custom?.[0] ?? argv[0]}: ${run.stderr.trim().split('\n')[0] || `exit ${run.exitCode}`}`)
   } catch {
-    $.ui.toast(`could not open ${path} with ${editor ?? custom?.[0] ?? 'the default app'}`)
+    $.ui.toast(`não foi possível abrir ${path} com ${editor ?? custom?.[0] ?? 'o app padrão'}`)
   }
 }
 
@@ -1012,7 +1012,7 @@ async function quickLook($: EngineInterface, path: string): Promise<void> {
   try {
     await $.process.run(['sh', '-c', '(nohup qlmanage -p "$1" >/dev/null 2>&1 &); sleep 0.4; osascript -e \'tell application "System Events" to set frontmost of first process whose name is "qlmanage" to true\' >/dev/null 2>&1 || true', 'sh', path], { timeoutMs: 10_000 })
   } catch {
-    $.ui.toast(`could not preview ${path} with Quick Look`)
+    $.ui.toast(`não foi possível pré-visualizar ${path} com o Quick Look`)
   }
 }
 
@@ -1109,7 +1109,7 @@ function shortPath(path: string): string {
 }
 
 export async function filetreeSessionStart($: EngineInterface, e: PartEvent<'session.start'>, next: PartNext<'session.start'>): PartResult<'session.start'> {
-  await $.command.register({ name: 'filetree', description: 'Show the file tree; args: [path] (no path = cwd)' })
+  await $.command.register({ name: 'filetree', description: 'Mostra a árvore de arquivos; argumento: [caminho] (sem caminho = pasta atual)' })
   const windows = (await $.env.get('OS')) === 'Windows_NT'
   useDrives(windows)
   inTmux = !windows && Boolean(await $.env.get('TMUX'))
@@ -1132,10 +1132,10 @@ export async function filetreeSessionStart($: EngineInterface, e: PartEvent<'ses
     const t = await get($)
     if (t.flashOn) await patch($, () => ({ flash: [], flashDim: [], flashOn: false, flashTones: {} }))
     if (t.preview) await patch($, () => ({ preview: '', previewTop: 0 }))
-    await setActivities($, cur => cur.map(a => (a.state === 'running' ? { ...a, state: 'failed', label: `${a.kind} interrupted` } : a)))
+    await setActivities($, cur => cur.map(a => (a.state === 'running' ? { ...a, state: 'failed', label: `${a.kind} interrompido` } : a)))
     const cwd = await cwdOf($)
     if (!t.root || t.nodes.length === 0 || (follow && t.root !== cwd)) await reset($, cwd)
-    else if (!noDock) await $.ui.open({ id: PANE, title: `Files: ${t.root.split('/').pop() || t.root}` })
+    else if (!noDock) await $.ui.open({ id: PANE, title: `Arquivos: ${t.root.split('/').pop() || t.root}` })
   })()
   return next(e)
 }
@@ -1258,15 +1258,15 @@ export const register = (on: On, options: PluginOptions): void => {
     // The layout checks are the terminal's: the desktop app docks the pane itself and
     // reports no fullscreen layout, so a session no terminal draws skips them.
     const terminal = await $.session.surfaces().then(s => s.includes('terminal'), () => true)
-    if (terminal && !e.presentation.isFullscreen) return { text: 'filetree shows in the sidebar, which needs the fullscreen layout. Run /tui fullscreen, then /filetree.' }
-    if (terminal && e.presentation.columns < 110) return { text: 'filetree shows in the sidebar, which needs a terminal at least 110 columns wide. Widen it, then run /filetree.' }
+    if (terminal && !e.presentation.isFullscreen) return { text: 'A árvore de arquivos fica na barra lateral, que precisa do layout em tela cheia. Rode /tui fullscreen e depois /filetree.' }
+    if (terminal && e.presentation.columns < 110) return { text: 'A árvore de arquivos fica na barra lateral, que precisa de um terminal com pelo menos 110 colunas. Aumente a janela e rode /filetree.' }
     noDock = false
     const arg = (e.args ?? '').trim()
     const cwd = await cwdOf($)
     follow = !arg
     const root = arg ? resolve(cwd, arg, home) : cwd
     await reset($, root, true)
-    return { text: `File tree on ${shortPath(root)}${follow ? ' (follows the cwd)' : ''}.` }
+    return { text: `Árvore de arquivos em ${shortPath(root)}${follow ? ' (segue a pasta atual)' : ''}.` }
   })
 
   on('tool.call', { tool: 'Read' }, async ($, e, next) => {
@@ -1403,11 +1403,11 @@ export const register = (on: On, options: PluginOptions): void => {
       const win = previewLines(p?.text ?? '', nativeScroll ? 0 : Math.min(t.previewTop, Math.max(0, all - previewRows)), previewRows, markdown)
       previewLine = win.top + 1
       const name = t.preview !== t.root && inside(t.root, t.preview) ? relative(t.root, t.preview) : shortPath(t.preview)
-      const external = { id: 'external', label: unicode ? '↗' : '\u{f08e}', dim: true, hint: 'open in default app' }
+      const external = { id: 'external', label: unicode ? '↗' : '\u{f08e}', dim: true, hint: 'abrir no app padrão' }
       return (
         <Box flexDirection="column" minHeight={Math.max(1, e.props.scroll?.bodyRows ?? 1)} backgroundColor={theme.bg || undefined}>
           <Box flexDirection="row">
-            <Button key="back" plain hotkey="h" autoFocus={editWithSetting || inTmux ? undefined : true} label={unicode ? '← files' : '\u{f004d} files'} onPress={() => void closePreview($)} />
+            <Button key="back" plain hotkey="h" autoFocus={editWithSetting || inTmux ? undefined : true} label={unicode ? '← arquivos' : '\u{f004d} arquivos'} onPress={() => void closePreview($)} />
             <Text> </Text>
             <Box flexShrink={1} flexGrow={1}>
               <Text bold wrap="truncate-start">{name}</Text>
@@ -1419,7 +1419,7 @@ export const register = (on: On, options: PluginOptions): void => {
             {([['j', '↓', '\u{f0045}', 1], ['k', '↑', '\u{f005d}', -1], ['f', 'page ↓', '\u{f0045} page', previewRows - 2], ['b', 'page ↑', '\u{f005d} page', 2 - previewRows]] as const).map(([k, plain, nerd, by]) => (
               <Button key={`pv-${k}`} plain dimColor hotkey={k} label={unicode ? plain : nerd} onPress={() => void scrollPreview($, by).then(() => parkPreview($))} />
             ))}
-            {editWithSetting || inTmux ? <Button key="edit" plain dimColor autoFocus hotkey="e" label={`${unicode ? 'edit' : '\u{f03eb} edit'} :${previewLine}`} onPress={() => void editPreview($, t.preview)} /> : null}
+            {editWithSetting || inTmux ? <Button key="edit" plain dimColor autoFocus hotkey="e" label={`${unicode ? 'editar' : '\u{f03eb} editar'} :${previewLine}`} onPress={() => void editPreview($, t.preview)} /> : null}
           </Box>
           {p?.note ? <Text dimColor={!light} color={light ? theme.muted : undefined}>{p.note}</Text> : null}
           <Client
@@ -1472,13 +1472,13 @@ export const register = (on: On, options: PluginOptions): void => {
     }
     const rootCounts = t.top ? countSegs(t.counts[t.root]) : []
     const buttons = [
-      { id: 'up', label: unicode ? '↑' : '\u{f005d}', dim: true, hint: 'parent folder' },
-      { id: 'cwd', label: unicode ? '⌂' : '\u{f02dc}', dim: !follow, hint: 'follow the cwd' },
-      { id: 'refresh', label: unicode ? '↻' : '\u{f0450}', dim: true, hint: 'reload tree and git' },
-      { id: 'hidden', label: unicode ? (t.showHidden ? '◉' : '○') : t.showHidden ? '\u{f0208}' : '\u{f0209}', dim: !t.showHidden, hint: t.showHidden ? 'hide hidden files' : 'show hidden files' },
-      { id: 'size', label: unicode ? 'Σ' : '\u{f02ca}', dim: !t.showSize, hint: t.showSize ? 'show dates' : 'show sizes' },
-      { id: 'collapse', label: unicode ? '⊟' : '\u{eac5}', dim: true, hint: 'collapse all' },
-      ...(t.selected ? [{ id: 'unselect', label: unicode ? '⊘' : '\u{f0777}', dim: false, hint: 'clear selection' }] : []),
+      { id: 'up', label: unicode ? '↑' : '\u{f005d}', dim: true, hint: 'pasta acima' },
+      { id: 'cwd', label: unicode ? '⌂' : '\u{f02dc}', dim: !follow, hint: 'seguir a pasta atual' },
+      { id: 'refresh', label: unicode ? '↻' : '\u{f0450}', dim: true, hint: 'recarregar árvore e git' },
+      { id: 'hidden', label: unicode ? (t.showHidden ? '◉' : '○') : t.showHidden ? '\u{f0208}' : '\u{f0209}', dim: !t.showHidden, hint: t.showHidden ? 'esconder arquivos ocultos' : 'mostrar arquivos ocultos' },
+      { id: 'size', label: unicode ? 'Σ' : '\u{f02ca}', dim: !t.showSize, hint: t.showSize ? 'mostrar datas' : 'mostrar tamanhos' },
+      { id: 'collapse', label: unicode ? '⊟' : '\u{eac5}', dim: true, hint: 'recolher tudo' },
+      ...(t.selected ? [{ id: 'unselect', label: unicode ? '⊘' : '\u{f0777}', dim: false, hint: 'limpar seleção' }] : []),
     ]
     const header = t.top ? [t.top.split('/').pop() ?? t.top, t.prefix.replace(/\/$/, '')].filter(Boolean).join('/') : t.root.split('/').pop() || t.root
 
@@ -1536,7 +1536,7 @@ export const register = (on: On, options: PluginOptions): void => {
 
     const note = (text: string): RowSpec => ({ id: '', left: [{ t: text, c: theme.muted }], right: [] })
     const specs: RowSpec[] = [
-      ...(rows.length === 0 ? [note('empty')] : []),
+      ...(rows.length === 0 ? [note('vazio')] : []),
       ...pinned.map(rowSpec),
       ...(pinned.length > 0 ? [note('  ⋮')] : []),
       ...shown.map(rowSpec),
@@ -1620,14 +1620,14 @@ export const register = (on: On, options: PluginOptions): void => {
           </Box>
         </Box>
         {branchRow()}
-        {!t.top && showHints && <Text color={theme.muted}>{unicode ? '± ' : '\u{e702} '}no git repo · git status starts after git init</Text>}
+        {!t.top && showHints && <Text color={theme.muted}>{unicode ? '± ' : '\u{e702} '}sem repositório git · o status do git começa depois de git init</Text>}
         <Box flexDirection="row">
           <Box flexGrow={1}>
             <Input
               key="q"
               label="/ "
-              placeholder="search"
-              submitLabel="jump"
+              placeholder="buscar"
+              submitLabel="ir"
               value={t.query}
               onInput={(v: string) => void search($, v)}
               onSubmit={(v: string) => void jump($, v).then(() => $.clock.after(100, park))}
@@ -1639,8 +1639,8 @@ export const register = (on: On, options: PluginOptions): void => {
           {([['j', '↓', '\u{f0045}'], ['k', '↑', '\u{f005d}'], ['h', '←', '\u{f004d}'], ['l', '→', '\u{f0054}']] as const).map(([k, plain, nerd]) => (
             <Button key={`nav-${k}`} plain dimColor hotkey={k} label={unicode ? plain : nerd} onPress={() => void navigate($, k).then(park)} />
           ))}
-          <Button key="nav-o" plain dimColor autoFocus hotkey="o" label={unicode ? 'open' : '\u{f03cb} open'} onPress={() => void navigate($, 'return')} />
-          <Button key="nav-s" plain dimColor hotkey="s" label={unicode ? 'search' : '\u{f0349} search'} onPress={() => void $.ui.focus({ requestId: PANE, key: 'q' })} />
+          <Button key="nav-o" plain dimColor autoFocus hotkey="o" label={unicode ? 'abrir' : '\u{f03cb} abrir'} onPress={() => void navigate($, 'return')} />
+          <Button key="nav-s" plain dimColor hotkey="s" label={unicode ? 'buscar' : '\u{f0349} buscar'} onPress={() => void $.ui.focus({ requestId: PANE, key: 'q' })} />
         </Box>
         <Client
           key="rows"
