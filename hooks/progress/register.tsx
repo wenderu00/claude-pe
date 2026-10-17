@@ -2,7 +2,9 @@ import { atom, read, update } from 'claude-code'
 import type { EngineInterface, On, PluginOptions } from 'claude-code'
 import type { AbovePromptEvent, AbovePromptNext, AbovePromptResult, PartEvent, PartNext, PartResult } from '../parts'
 
-import type { AgentRun, Flow, Panel, Phase, PlannedTask } from '../../types'
+import type { AgentRun, Flow, Panel, PlannedTask, TaskItem } from '../../types'
+import { TOKENS } from '../pe/ds.generated'
+import { applyTaskCall, flowOf } from './tasks'
 
 const flow = atom({ plugin: 'pe-devkit', key: 'progressFlow' } as const, null)
 const agents = atom({ plugin: 'pe-devkit', key: 'progressAgents' } as const, [])
@@ -12,210 +14,53 @@ const panel = atom({ plugin: 'pe-devkit', key: 'progressPanel' } as const, {
   autoOpenedFor: '',
 })
 const now = atom({ plugin: 'pe-devkit', key: 'progressNow' } as const, 0)
+const tasks = atom({ plugin: 'pe-devkit', key: 'progressTasks' } as const, [] as TaskItem[])
 
-const TOOL = 'mcp__savvy-progress__progress'
-const STEP_TOOL = 'mcp__savvy-progress__step'
-// Added to the end of each savvy worker's brief. Their system prompt words step
-// reporting as a condition ("if the step tool appears among your tools") and they
-// skip it even with the tool listed; the same request in the brief is followed.
-const STEP_BRIEF = `
-
-Progress reporting: before any other work, call \`${STEP_TOOL}\` with \`total\` (your plan in 3-8 steps) and \`done: 0\`; call it again with \`done\` and a few-word \`note\` as each step finishes. It only draws a progress bar.`
-const PANE = 'savvy-agents'
-const PHASES: readonly Phase[] = ['plan', 'design', 'delegate', 'review', 'close']
-const TIERS: readonly string[] = ['fable', 'heavy', 'careful', 'medium', 'light']
-// The tools' schemas are advice to the model, not a check: what a call may ask
-// the band and the panel to draw is bounded here.
-const MAX_TASKS = 200
-const MAX_AFTER = 20
-const MAX_TITLE = 120
-const ACCENT = '#8f8cf4'
-const DONE = '#5fbf8f'
-
-type ProgressInput = {
-  title?: string
-  total?: number
-  done?: number
-  phase?: Phase
-  finished?: boolean
-  tasks?: { title?: string; tier?: string; after?: number[] }[]
-}
-
-// ---------------------------------------------------------------------------
-// Language: the `language` option, else Claude Code's `language` setting, else the
-// process locale; English when nothing says Hebrew or Russian.
-
-type Lang = 'en' | 'ru' | 'he'
+const PANE = 'progress-agents'
+const L = TOKENS.light
+const D = TOKENS.dark
+const TASK_TOOLS = /^(TaskCreate|TaskUpdate|TodoWrite|TaskList)$/
+// Liga Digital tokens: the bar in the primary blue, a finished bar in the success green.
+const ACCENT = TOKENS.dark['--color-text-primary']!
+const DONE = TOKENS.dark['--color-text-success']!
 
 const STRINGS = {
-  en: {
-    pane: 'Agents',
-    cost: 'Cost',
-    tokens: 'Tokens',
-    time: 'Time',
-    collapse: 'Collapse',
-    expand: 'Expand',
-    running: 'Running',
-    finished: 'Finished',
-    planned: 'Planned',
-    empty: 'No subagents yet.',
-    round: 'round',
-    failed: 'error',
-    after: 'after',
-    tokensWord: 'tokens',
-    agentsCount: 'agents',
-    isRunning: 'running',
-    isFinished: 'finished',
-    isPlanned: 'planned',
-    opened: 'Agents panel opened.',
-    closed: 'Agents panel closed.',
-    done: 'Done',
-    plan: 'Plan',
-    design: 'Design',
-    tasks: 'Tasks',
-    review: 'Review',
-    busy: 'running',
-    ctx: 'ctx',
-    tier: { light: 'light', medium: 'medium', careful: 'careful', heavy: 'heavy', fable: 'fable', other: 'other' },
-    effort: { low: 'low', medium: 'medium', high: 'high', xhigh: 'xhigh', max: 'max' },
-  },
-  ru: {
-    pane: 'Агенты',
-    cost: 'Стоимость',
-    tokens: 'Токены',
-    time: 'Время',
-    collapse: 'Свернуть',
-    expand: 'Развернуть',
-    running: 'Работают',
-    finished: 'Завершены',
-    planned: 'Запланированы',
-    empty: 'Субагентов пока нет.',
-    round: 'раунд',
-    failed: 'ошибка',
-    after: 'после',
-    tokensWord: 'токенов',
-    agentsCount: 'агентов',
-    isRunning: 'работает',
-    isFinished: 'завершён',
-    isPlanned: 'запланирована',
-    opened: 'Панель агентов открыта.',
-    closed: 'Панель агентов закрыта.',
-    done: 'Готово',
-    plan: 'План',
-    design: 'Дизайн',
-    tasks: 'Задачи',
-    review: 'Ревью',
-    busy: 'в работе',
-    ctx: 'ctx',
-    tier: { light: 'light', medium: 'medium', careful: 'careful', heavy: 'heavy', fable: 'fable', other: 'other' },
-    effort: { low: 'low', medium: 'medium', high: 'high', xhigh: 'xhigh', max: 'max' },
-  },
-  he: {
-    pane: 'סוכנים',
-    cost: 'עלות',
-    tokens: 'טוקנים',
-    time: 'זמן',
-    collapse: 'כיווץ',
-    expand: 'הרחבה',
-    running: 'פועלים',
-    finished: 'הסתיימו',
-    planned: 'מתוכננים',
-    empty: 'עדיין אין סוכנים.',
-    round: 'סבב',
-    failed: 'שגיאה',
-    after: 'אחרי',
-    tokensWord: 'טוקנים',
-    agentsCount: 'סוכנים',
-    isRunning: 'פועל',
-    isFinished: 'הסתיים',
-    isPlanned: 'מתוכנן',
-    opened: 'חלונית הסוכנים נפתחה.',
-    closed: 'חלונית הסוכנים נסגרה.',
-    done: 'הושלם',
-    plan: 'תכנון',
-    design: 'עיצוב',
-    tasks: 'משימות',
-    review: 'בדיקה',
-    busy: 'בעבודה',
-    ctx: 'הקשר',
-    tier: { light: 'קל', medium: 'בינוני', careful: 'זהיר', heavy: 'כבד', fable: 'פייבל', other: 'אחר' },
-    effort: { low: 'נמוך', medium: 'בינוני', high: 'גבוה', xhigh: 'גבוה מאוד', max: 'מקסימלי' },
-  },
+  pane: 'Agentes',
+  cost: 'Custo',
+  tokens: 'Tokens',
+  time: 'Tempo',
+  collapse: 'Recolher',
+  expand: 'Expandir',
+  running: 'Rodando',
+  finished: 'Concluídos',
+  planned: 'Planejados',
+  empty: 'Nenhum subagente ainda.',
+  round: 'rodada',
+  failed: 'erro',
+  after: 'depois de',
+  tokensWord: 'tokens',
+  agentsCount: 'agentes',
+  isRunning: 'rodando',
+  isFinished: 'concluído',
+  isPlanned: 'planejado',
+  opened: 'Painel de agentes aberto.',
+  closed: 'Painel de agentes fechado.',
+  done: 'Concluído',
+  plan: 'Plano',
+  design: 'Design',
+  tasks: 'Tarefas',
+  review: 'Revisão',
+  busy: 'em andamento',
+  ctx: 'ctx',
+  tier: { light: 'leve', medium: 'médio', careful: 'cuidadoso', heavy: 'pesado', fable: 'fable', other: 'outro' },
+  effort: { low: 'baixo', medium: 'médio', high: 'alto', xhigh: 'muito alto', max: 'máximo' },
 } as const
 
-// Module scope is fine here: session.start sets it again on every (re)load.
-let lang: Lang = 'en'
-const tr = () => STRINGS[lang]
-
-// Hebrew draws every row mirrored: crab and title on the right, numbers on the left.
-const isRtl = () => lang === 'he'
+const tr = () => STRINGS
 
 // Tier and effort words as shown; anything unknown shows as it came.
 const tierWord = (tier: string): string => (tr().tier as Record<string, string>)[tier] ?? tier
 const effortWord = (effort: string): string => (tr().effort as Record<string, string>)[effort] ?? effort
-
-const isRussian = (v: unknown): boolean => typeof v === 'string' && /^(ru|russian|рус)/i.test(v.trim())
-const isHebrew = (v: unknown): boolean => typeof v === 'string' && /^(he|iw|hebrew|עברית)/i.test(v.trim())
-const langOf = (v: unknown): Lang => (isHebrew(v) ? 'he' : isRussian(v) ? 'ru' : 'en')
-
-async function detectLang($: EngineInterface, option: unknown): Promise<Lang> {
-  if (option === 'en' || option === 'ru' || option === 'he') return option
-  try {
-    const settings = (await $.settings.read()) as Record<string, unknown>
-    if (typeof settings.language === 'string' && settings.language.trim()) return langOf(settings.language)
-  } catch {
-    // No settings: fall through to the locale.
-  }
-  const locale = (await $.env.get('LC_ALL')) || (await $.env.get('LC_MESSAGES')) || (await $.env.get('LANG'))
-  return langOf(locale)
-}
-
-const blank = (): Flow => ({
-  title: 'savvy-flow',
-  total: 0,
-  done: 0,
-  running: 0,
-  phase: 'plan',
-  isFinished: false,
-  tasks: [],
-})
-
-const isNewFlow = (prev: Flow | null, input: ProgressInput): boolean =>
-  !prev || prev.isFinished || (input.title !== undefined && clip(input.title.trim(), MAX_TITLE) !== prev.title)
-
-// Only a known tier is kept: the name is later a key into the tier tables.
-const tierName = (v: string): string => {
-  const t = v.replace(/^savvy-/, '').trim().toLowerCase()
-  return TIERS.includes(t) ? t : ''
-}
-
-const cleanTasks = (tasks: ProgressInput['tasks']): PlannedTask[] | undefined =>
-  tasks
-    ?.filter(t => t.title?.trim())
-    .slice(0, MAX_TASKS)
-    .map(t => ({
-      title: (t.title ?? '').trim(),
-      tier: tierName(t.tier ?? ''),
-      after: (t.after ?? []).filter(n => Number.isInteger(n) && n > 0).slice(0, MAX_AFTER),
-    }))
-
-const merge = (prev: Flow | null, input: ProgressInput): Flow => {
-  // A new title means a new flow: never carry counters over from an earlier one.
-  const base = isNewFlow(prev, input) || !prev ? blank() : { ...blank(), ...prev }
-  const tasks = cleanTasks(input.tasks) ?? base.tasks
-  const total = Math.min(MAX_TASKS, Math.max(0, Math.round(input.total ?? (input.tasks ? tasks.length : base.total))))
-  const done = Math.min(total || Infinity, Math.max(0, Math.round(input.done ?? base.done)))
-  const phase = input.phase && PHASES.includes(input.phase) ? input.phase : base.phase
-  return {
-    ...base,
-    title: clip(input.title?.trim() || base.title, MAX_TITLE),
-    total,
-    done,
-    phase: input.finished ? 'close' : phase,
-    isFinished: input.finished === true,
-    tasks,
-  }
-}
 
 const label = (f: Flow): string => {
   const s = tr()
@@ -282,11 +127,6 @@ const rowSvg = (f: Flow, W: number, isWorking: boolean): string => {
   const fillW = Math.round(BAR_W * ratio(f))
   const runW = f.total ? Math.round((BAR_W * Math.min(f.total, f.done + f.running)) / f.total) : 0
   const dots: string[] = []
-  // Positions are worked out left to right; right to left mirrors each box
-  // inside the bar (`bx`) and across the row (`rx`). Text is never mirrored.
-  const rtl = isRtl()
-  const bx = (x: number, w: number): number => (rtl ? BAR_W - x - w : x)
-  const rx = (x: number, w: number): number => (rtl ? W - x - w : x)
 
   // Dithered fill: sparse at the start, dense toward the head.
   const cols = Math.floor(fillW / CELL)
@@ -294,36 +134,35 @@ const rowSvg = (f: Flow, W: number, isWorking: boolean): string => {
   for (let c = 0; c < cols; c++) {
     const density = 0.35 + 0.6 * Math.pow(c / Math.max(1, cols), 1.2)
     for (let r = 0; r < rows; r++) {
-      if (noise(c, r) < density) dots.push(`<rect class="t${Math.floor(noise(r, c) * 4)}" x="${bx(c * CELL + 1, 2)}" y="${r * CELL + 1}" width="2" height="2"/>`)
+      if (noise(c, r) < density) dots.push(`<rect class="t${Math.floor(noise(r, c) * 4)}" x="${c * CELL + 1}" y="${r * CELL + 1}" width="2" height="2"/>`)
     }
   }
   // Handed to workers, not yet accepted: a faint second layer.
   const faint: string[] = []
   for (let c = cols; c < Math.floor(runW / CELL); c++) {
     for (let r = 0; r < rows; r++) {
-      if (noise(c + 7, r + 3) < 0.2) faint.push(`<rect class="t${Math.floor(noise(r + 5, c) * 4)}" x="${bx(c * CELL + 1, 1.7)}" y="${r * CELL + 1}" width="1.7" height="1.7"/>`)
+      if (noise(c + 7, r + 3) < 0.2) faint.push(`<rect class="t${Math.floor(noise(r + 5, c) * 4)}" x="${c * CELL + 1}" y="${r * CELL + 1}" width="1.7" height="1.7"/>`)
     }
   }
 
   const ticks: string[] = []
   for (let i = 1; i < f.total; i++) {
     const x = Math.round((BAR_W * i) / f.total)
-    if (x > fillW + 4) ticks.push(`<rect x="${bx(x, 1.5)}" y="${BAR_H / 2 - 4}" width="1.5" height="8" rx="0.75"/>`)
+    if (x > fillW + 4) ticks.push(`<rect x="${x}" y="${BAR_H / 2 - 4}" width="1.5" height="8" rx="0.75"/>`)
   }
 
   const text = label(f)
   const pillW = Math.round(18 + text.length * 6.6)
-  const pillX = bx(Math.max(0, Math.min(BAR_W - pillW, fillW - pillW)), pillW)
+  const pillX = Math.max(0, Math.min(BAR_W - pillW, fillW - pillW))
   const percent = `${Math.round(ratio(f) * 100)}%`
-  // `direction="rtl"` puts Hebrew words and numbers in reading order; `start` is then the right edge.
-  const titleAt = rtl ? `x="${W - 16}" direction="rtl" text-anchor="start"` : 'x="16"'
-  const percentAt = rtl ? `x="${CRAB_W + 6}" y="${H / 2 + 4.5}"` : `x="${W - CRAB_W - 6}" y="${H / 2 + 4.5}" text-anchor="end"`
+  const titleAt = 'x="16"'
+  const percentAt = `x="${W - CRAB_W - 6}" y="${H / 2 + 4.5}" text-anchor="end"`
   const crabW = CRAB_BOX * 0.8
 
   return `<svg xmlns="http://www.w3.org/2000/svg" width="${W}" height="${H}" viewBox="0 0 ${W} ${H}">
 <style>
-.t{fill:#1f1f1f}.m{fill:#8a8a8a}.k{fill:#e4e4e2}.tk{fill:#b4b4b0}
-@media (prefers-color-scheme: dark){.t{fill:#ececec}.m{fill:#9a9a9a}.k{fill:#2c2c2c}.tk{fill:#5a5a5a}}
+.t{fill:${L['--color-text-default']}}.m{fill:${L['--color-text-secondary']}}.k{fill:${L['--color-light-gray-softer']}}.tk{fill:${L['--color-light-gray-soft']}}
+@media (prefers-color-scheme: dark){.t{fill:${D['--color-text-default']}}.m{fill:${D['--color-text-placeholder']}}.k{fill:${D['--color-dark-gray-soft']}}.tk{fill:${D['--color-dark-gray-softest']}}}
 /* Pixels twinkle in four out-of-phase groups; a finished bar settles to a slow glow. */
 .t0,.t1,.t2,.t3{animation:tw ${f.isFinished ? 3.2 : 2.2}s ease-in-out infinite}
 .t1{animation-duration:${f.isFinished ? 3.8 : 2.8}s;animation-delay:-.7s}.t2{animation-duration:${f.isFinished ? 4.4 : 1.9}s;animation-delay:-1.3s}.t3{animation-duration:${f.isFinished ? 3.5 : 3.3}s;animation-delay:-.4s}
@@ -331,9 +170,9 @@ const rowSvg = (f: Flow, W: number, isWorking: boolean): string => {
 @media (prefers-reduced-motion: reduce){.t0,.t1,.t2,.t3{animation:none}}
 </style>
 <defs><clipPath id="c"><rect x="0" y="0" width="${BAR_W}" height="${BAR_H}" rx="${BAR_H / 2}"/></clipPath></defs>
-<circle cx="${rtl ? W - 5 : 5}" cy="${H / 2}" r="4" fill="${color}"/>
+<circle cx="5" cy="${H / 2}" r="4" fill="${color}"/>
 <text class="t" ${titleAt} y="${H / 2 + 4.5}" font-family="${FONT}" font-size="13" font-weight="500">${xml(title)}</text>
-<g transform="translate(${rx(BAR_X, BAR_W)},${y0})">
+<g transform="translate(${BAR_X},${y0})">
 <rect class="k" width="${BAR_W}" height="${BAR_H}" rx="${BAR_H / 2}"/>
 <g clip-path="url(#c)">
 <g fill="${color}">${dots.join('')}</g>
@@ -341,10 +180,10 @@ const rowSvg = (f: Flow, W: number, isWorking: boolean): string => {
 <g class="tk">${ticks.join('')}</g>
 </g>
 <rect x="${pillX}" width="${pillW}" height="${BAR_H}" rx="${BAR_H / 2}" fill="${color}"/>
-<text x="${pillX + pillW / 2}" y="${BAR_H / 2 + 4}" text-anchor="middle"${rtl ? ' direction="rtl"' : ''} font-family="${FONT}" font-size="11" font-weight="600" fill="#ffffff">${xml(text)}</text>
+<text x="${pillX + pillW / 2}" y="${BAR_H / 2 + 4}" text-anchor="middle" font-family="${FONT}" font-size="11" font-weight="600" fill="#ffffff">${xml(text)}</text>
 </g>
 <text class="m" ${percentAt} font-family="${FONT}" font-size="12.5" font-variant-numeric="tabular-nums">${percent}</text>
-${CRAB_CSS}${crab(rx(W - CRAB_W + 1, crabW), 0, 'other', false, isWorking, 0.8, rtl)}
+${CRAB_CSS}${crab(W - CRAB_W + 1, 0, 'other', false, isWorking, 0.8)}
 </svg>`
 }
 
@@ -357,16 +196,16 @@ const barText = (f: Flow, width: number): string => {
 // Agents panel: every subagent of the session, plus the tasks the flow planned.
 
 const TIER_COLOR: Record<string, string> = {
-  fable: '#7F77DD',
-  heavy: '#D85A30',
-  careful: '#BA7517',
-  medium: '#378ADD',
-  light: '#1D9E75',
-  other: '#888780',
+  fable: D['--color-light-blue-soft']!,
+  heavy: D['--color-light-red-soft']!,
+  careful: D['--color-light-yellow-default']!,
+  medium: D['--color-light-blue-softer']!,
+  light: D['--color-light-green-soft']!,
+  other: D['--color-light-gray-soft']!,
 }
 
 // What each savvy tier runs on, for planned tasks that have no run yet.
-const colorOf = (tier: string): string => TIER_COLOR[tier] ?? '#888780'
+const colorOf = (tier: string): string => TIER_COLOR[tier] ?? TIER_COLOR.other!
 
 const TIER_MODEL: Record<string, [model: string, effort: string]> = {
   fable: ['Fable', 'high'],
@@ -498,14 +337,14 @@ const LINE_H = 24
 const GRID_TILE = 4096
 const gridTiles = (H: number) => Array.from({ length: Math.ceil(H / GRID_TILE) }, (_, i) => Math.min(GRID_TILE, H - i * GRID_TILE))
 const gridSvg = (W: number, H: number) => `<svg xmlns="http://www.w3.org/2000/svg" width="${W}" height="${H}" viewBox="0 0 ${W} ${H}">
-<style>.d{fill:#d9d8d4}@media (prefers-color-scheme: dark){.d{fill:#3a3a38}}</style>
+<style>.d{fill:${L['--color-light-gray-soft']}}@media (prefers-color-scheme: dark){.d{fill:${D['--color-dark-gray-softer']}}}</style>
 <defs><pattern id="g" width="${GRID_STEP}" height="${GRID_STEP}" patternUnits="userSpaceOnUse"><circle class="d" cx="${GRID_STEP / 2}" cy="${GRID_STEP / 2}" r="1"/></pattern></defs>
 <rect width="${W}" height="${H}" fill="url(#g)"/>
 </svg>`
 
 const PANE_CSS = `<style>
-.t{fill:#1f1f1f}.s{fill:#6b6b68}.m{fill:#9a9a96}.k{fill:#ecebe8}.ln{stroke:#e4e4e1}.tile{fill:#f4f3f0}
-@media (prefers-color-scheme: dark){.t{fill:#ececec}.s{fill:#a8a8a4}.m{fill:#7d7d79}.k{fill:#2c2c2b}.ln{stroke:#333331}.tile{fill:#262625}}
+.t{fill:${L['--color-text-default']}}.s{fill:${L['--color-text-secondary']}}.m{fill:${L['--color-text-placeholder']}}.k{fill:${L['--color-light-gray-softer']}}.ln{stroke:${L['--color-light-gray-soft']}}.tile{fill:${L['--color-light-gray-softest']}}
+@media (prefers-color-scheme: dark){.t{fill:${D['--color-text-default']}}.s{fill:${D['--color-text-secondary']}}.m{fill:${D['--color-text-placeholder']}}.k{fill:${D['--color-dark-gray-soft']}}.ln{stroke:${D['--color-dark-gray-softer']}}.tile{fill:${D['--color-dark-gray-default']}}}
 .live{animation:p 1.6s ease-in-out infinite}@keyframes p{50%{opacity:.3}}
 @media (prefers-reduced-motion: reduce){.live{animation:none}}
 </style>`
@@ -640,27 +479,20 @@ const statusMark = (x: number, y: number, status: string, color: string): string
   return `<circle cx="${x}" cy="${y}" r="5" fill="none" stroke="#9a9a96" stroke-width="1.4"/><path d="M${x} ${y - 2.5}v2.8l1.8 1.2" fill="none" stroke="#9a9a96" stroke-width="1.4" stroke-linecap="round"/>`
 }
 
-// Panel rows are laid out left to right; in Hebrew each box mirrors across the
-// row (`mx`) and text hugs the mirrored side. `words` text may hold Hebrew and
-// takes `direction="rtl"` (whose `start` is the right edge); numbers stay
-// left to right so "≈$0.25" keeps its order.
-const mx = (W: number, x: number, w = 0): number => (isRtl() ? W - x - w : x)
+// Panel rows are laid out left to right: a box at x in a row of width W.
+const mx = (_W: number, x: number, _w = 0): number => x
 
-// Text that starts at x: left-aligned, or right-aligned at the mirrored x.
-const startText = (W: number, x: number, y: number, words = true): string =>
-  !isRtl()
-    ? `x="${x}" y="${y}"`
-    : `x="${W - x}" y="${y}"${words ? ' direction="rtl" text-anchor="start"' : ' text-anchor="end"'}`
+// Text that starts at x.
+const startText = (_W: number, x: number, y: number, _words = true): string => `x="${x}" y="${y}"`
 
-// Text that ends at x: right-aligned, or left-aligned at the mirrored x.
-const endText = (W: number, x: number, y: number, words = false): string =>
-  !isRtl() ? `x="${x}" y="${y}" text-anchor="end"` : `x="${W - x}" y="${y}"${words ? ' direction="rtl" text-anchor="end"' : ''}`
+// Text that ends at x.
+const endText = (_W: number, x: number, y: number, _words = false): string => `x="${x}" y="${y}" text-anchor="end"`
 
 const crabWidth = (scale: number): number => Math.round(CRAB_BOX * scale * 100) / 100
 
-// A panel crab at x in a row of width W: on the mirrored side and facing left in Hebrew.
+// A panel crab at x in a row of width W.
 const rowCrab = (W: number, x: number, y: number, costume: string, dim = false, isWalking = false): string =>
-  crab(mx(W, x, crabWidth(CRAB_SCALE)), y, costume, dim, isWalking, CRAB_SCALE, isRtl())
+  crab(mx(W, x, crabWidth(CRAB_SCALE)), y, costume, dim, isWalking, CRAB_SCALE)
 
 const svg = (W: number, H: number, body: string): string =>
   `<svg xmlns="http://www.w3.org/2000/svg" width="${W}" height="${H}" viewBox="0 0 ${W} ${H}">${PANE_CSS}${CRAB_CSS}${body}</svg>`
@@ -791,65 +623,11 @@ async function autoOpen($: EngineInterface, key: string): Promise<void> {
   void $.ui.open({ id: PANE, title: tr().pane })
 }
 
-// userConfig.language, read by the session.start hook.
-let languageSetting: unknown
-
 export async function progressSessionStart($: EngineInterface, e: PartEvent<'session.start'>, next: PartNext<'session.start'>): PartResult<'session.start'> {
   const started = await next(e)
-  lang = await detectLang($, languageSetting)
-  await $.tool.register({
-    name: 'progress',
-    description:
-      'Report /savvy-flow progress to the progress bar above the prompt and the agents panel. ' +
-      'Call it after presenting the plan (title, total, tasks, phase "delegate"), each time a task is accepted (done), ' +
-      'when switching phase or re-planning (tasks), and once at the end with finished: true. Fields left out keep their previous value. ' +
-      'For the main session only: a call from a subagent is ignored (workers report with `step`).',
-    inputSchema: {
-      type: 'object',
-      properties: {
-        title: { type: 'string', description: 'Short name of the overall task, a few words.' },
-        total: { type: 'integer', minimum: 0, description: 'Number of planned worker tasks.' },
-        done: { type: 'integer', minimum: 0, description: 'Number of tasks accepted after review.' },
-        phase: { type: 'string', enum: [...PHASES] },
-        finished: { type: 'boolean', description: 'True once the flow is closed.' },
-        tasks: {
-          type: 'array',
-          description:
-            'The planned worker tasks in order, numbered from 1. Each title must equal the Agent tool `description` the task will be delegated with, so the panel can match runs to tasks.',
-          items: {
-            type: 'object',
-            properties: {
-              title: { type: 'string', description: 'A few words; reused verbatim as the Agent description.' },
-              tier: { type: 'string', enum: [...TIERS] },
-              after: { type: 'array', items: { type: 'integer' }, description: 'Numbers of the tasks this one waits for.' },
-            },
-            required: ['title', 'tier'],
-          },
-        },
-      },
-    },
-  })
-  await $.tool.register({
-    name: 'step',
-    description:
-      'For savvy-flow workers: report progress on your own task to the agents panel. ' +
-      'Right after reading the brief, call it with `total` (your plan in 3-8 steps) and `done: 0`; ' +
-      'call it again as each step finishes. Cheap and silent: it only draws a bar.',
-    inputSchema: {
-      type: 'object',
-      properties: {
-        done: { type: 'integer', minimum: 0, description: 'Steps finished so far.' },
-        total: { type: 'integer', minimum: 1, description: 'Steps planned; may change if the plan changes.' },
-        note: { type: 'string', description: 'The step in progress, a few words.' },
-      },
-      required: ['done'],
-    },
-    // In every agent's tool list, not behind ToolSearch: workers do not go looking for it.
-    isDeferred: false,
-  })
   await $.command.register({
     name: 'agents-info',
-    description: 'Show or hide the panel of subagents: running, finished and planned, with model, context, cost and time',
+    description: 'Mostra ou esconde o painel de subagentes: rodando, concluídos e planejados, com modelo, contexto, custo e tempo',
   })
 
   // Ticks the running agents' clocks; quiet when nothing runs.
@@ -910,12 +688,12 @@ export async function progressAbovePrompt($: EngineInterface, e: AbovePromptEven
   const crew = list.length + plannedOf(f, list).length
   const isWorking = list.some(a => a.status === 'running')
   const crewButton = (
-    <Button key="savvy-agents" label={`×${crew}`} plain onPress={() => void togglePane($)} />
+    <Button key="progress-agents" label={`×${crew}`} plain onPress={() => void togglePane($)} />
   )
   const percent = `${Math.round(ratio(f) * 100)}%`
   const dismiss = (
     <Button
-      key="savvy-dismiss"
+      key="progress-dismiss"
       label="✕"
       plain
       role="dismiss"
@@ -931,7 +709,7 @@ export async function progressAbovePrompt($: EngineInterface, e: AbovePromptEven
     const width = Math.max(180, Math.min(1600, (e.props.bodyColumns || 100) * 8 - 96))
     return (
       <Box flexDirection="column">
-        <Box flexDirection={isRtl() ? 'row-reverse' : 'row'} alignItems="center" gap={1}>
+        <Box flexDirection="row" alignItems="center" gap={1}>
           <Svg source={rowSvg(f, width, isWorking)} alt={`${f.title}: ${label(f)}, ${percent}`} width={width} height={H} />
           {crewButton}
           {dismiss}
@@ -964,7 +742,6 @@ export async function progressAbovePrompt($: EngineInterface, e: AbovePromptEven
 }
 
 export const register = (on: On, options: PluginOptions): void => {
-  languageSetting = options.language
   on('command.run', { command: 'agents-info' }, async ($, e) => {
     // `/agents-info open` opens the panel, or brings it forward from behind another tab, without toggling it.
     if ((e.args ?? '').trim() === 'open') {
@@ -977,58 +754,17 @@ export const register = (on: On, options: PluginOptions): void => {
     return { text: isOpen ? tr().opened : tr().closed }
   })
 
-  on('tool.call', { tool: TOOL }, async ($, e) => {
-    // The flow is the main session's: a call from a worker's loop carries its agentId
-    // and changes nothing, or any subagent could rename, finish or reset the flow.
-    if (e.agentId) return { result: 'ignored: only the main session reports the flow' }
-    const input = e as unknown as ProgressInput
-    const prev = await read($, flow)
-    if (isNewFlow(prev, input) && input.title !== undefined) {
-      // A new flow starts with a clean list; agents still running stay.
-      await update($, agents, list => list.filter(a => a.status === 'running'))
-    }
-    const next = await update($, flow, p => merge(p, input))
-    if (next && input.tasks?.length) await autoOpen($, next.title)
-    return { result: `ok: ${label(next ?? blank())}` }
-  })
-
-  // A worker's own progress: the call runs in the worker's loop, so agentId names it.
-  on('tool.call', { tool: STEP_TOOL }, async ($, e) => {
-    const input = e as unknown as { done?: number; total?: number; note?: string }
-    const agentId = e.agentId
-    if (!agentId) return { result: 'ignored: only subagents report steps' }
-    let matched = false
-    await update($, agents, list =>
-      list.map(a => {
-        if (a.agentId !== agentId) return a
-        matched = true
-        const total = Math.max(0, Math.round(input.total ?? a.stepTotal ?? 0))
-        const done = Math.max(0, Math.round(input.done ?? a.stepDone ?? 0))
-        return { ...a, stepTotal: total, stepDone: total ? Math.min(total, done) : done, stepNote: input.note?.trim() || undefined }
-      }),
-    )
-    return { result: matched ? 'ok' : `ignored: no panel row for agent ${agentId}` }
-  })
-
-  // Safety net: worker launches move the faint layer even if the orchestrator forgets to report.
-  on('tool.call', { tool: 'Agent' }, async ($, e, next) => {
-    const type = String(e.subagent_type ?? '')
-    if (!type.startsWith('savvy-')) return next(e)
-
-    await update($, flow, prev => {
-      const base = prev && !prev.isFinished ? { ...blank(), ...prev } : blank()
-      return { ...base, running: base.running + 1, phase: base.phase === 'plan' ? 'delegate' : base.phase }
-    })
-    try {
-      return await next(e)
-    } finally {
-      await update($, flow, prev => (prev ? { ...prev, running: Math.max(0, prev.running - 1) } : prev))
-    }
+  // Claude's own task list draws the bar: the main session's, not a subagent's.
+  on('tool.call', { tool: TASK_TOOLS }, async ($, e, next) => {
+    const result = await next(e)
+    if (e.agentId !== undefined || result.deny !== undefined || result.isError) return result
+    const list = await update($, tasks, prev => applyTaskCall(prev, { tool: e.tool, input: e, result: result.result }))
+    await update($, flow, () => flowOf(list))
+    return result
   })
 
   on('agent.spawn', async ($, e, next) => {
-    const isUnbriefed = e.subagentType.startsWith('savvy-') && !e.prompt.includes(STEP_TOOL)
-    const started = await next(isUnbriefed ? { ...e, prompt: e.prompt + STEP_BRIEF } : e)
+    const started = await next(e)
     if (started.deny !== undefined) return started
 
     const at = await $.clock.now()
@@ -1052,10 +788,7 @@ export const register = (on: On, options: PluginOptions): void => {
       return [...list.filter(a => a.id !== run.id), run].slice(-200)
     })
     await update($, now, () => at)
-    if (e.subagentType.startsWith('savvy-')) {
-      const f = await read($, flow)
-      await autoOpen($, f && !f.isFinished ? f.title : 'savvy-flow')
-    } else if (options.autoOpen === 'subagente') {
+    if (options.autoOpen === 'subagente') {
       await autoOpen($, 'any-agent')
     }
     return started
@@ -1126,7 +859,7 @@ export const register = (on: On, options: PluginOptions): void => {
     const toggleDone = (
       <Button
         key="done"
-        label={`${p.isDoneCollapsed ? (isRtl() ? '◂' : '▸') : '▾'} ${s.finished} · ${finished.length}`}
+        label={`${p.isDoneCollapsed ? '▸' : '▾'} ${s.finished} · ${finished.length}`}
         plain
         onPress={() => update($, panel, prev => ({ ...prev, isDoneCollapsed: !prev.isDoneCollapsed }))}
       />
@@ -1143,8 +876,7 @@ export const register = (on: On, options: PluginOptions): void => {
         </Text>
       )
 
-      // In Hebrew the column hugs the right edge: section heads and buttons right-aligned.
-      const align = isRtl() ? 'flex-end' : undefined
+      const align = undefined
       if (p.isCompact) {
         return (
           <Box flexDirection="column" gap={1} alignItems={align}>

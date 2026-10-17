@@ -120,6 +120,7 @@ declare module 'claude-code' {
       progressAgents: AgentRun[]
       progressPanel: Panel
       progressNow: number
+      progressTasks: TaskItem[]
       // The file tree (hooks/filetree).
       filetreeTree: FileTree
       filetreeTheme: Theme
@@ -156,6 +157,10 @@ declare module 'claude-code' {
 }
 
 // The task bar and the agents panel (hooks/progress).
+// One task of Claude's task list, as the task tools report it.
+export type TaskStatus = 'pending' | 'in_progress' | 'completed'
+export type TaskItem = { id: string; subject: string; active: string; status: TaskStatus }
+
 export type Phase = 'plan' | 'design' | 'delegate' | 'review' | 'close'
 
 export type PlannedTask = {
