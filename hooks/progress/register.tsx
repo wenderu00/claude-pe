@@ -118,6 +118,36 @@ const fitText = (s: string, size: number, maxW: number): string => {
   return out + '…'
 }
 
+// The Pernambuco flag in the bar's fill: blue over white, two thirds to one third.
+const FLAG_WHITE = '#FFFFFF'
+const FLAG_BLUE_H = Math.round((BAR_H * 2) / 3)
+const EMBLEM_W = 10
+
+const starPath = (cx: number, cy: number, r: number): string =>
+  Array.from({ length: 10 }, (_, i) => {
+    const a = -Math.PI / 2 + (i * Math.PI) / 5
+    const d = i % 2 ? r * 0.42 : r
+    return `${i ? 'L' : 'M'}${(cx + d * Math.cos(a)).toFixed(2)} ${(cy + d * Math.sin(a)).toFixed(2)}`
+  }).join('') + 'Z'
+
+// The rainbow arc and the star on the blue, the cross on the white, `x` at the emblem's left edge.
+const flagEmblem = (x: number): string => {
+  const px = (dx: number, y: number, w: number, h: number, c: string): string =>
+    `<rect x="${x + dx}" y="${y}" width="${w}" height="${h}" fill="${c}"/>`
+  return [
+    px(2, 1, 6, 1, LIS_PALETTE.r),
+    px(1, 2, 1, 2, LIS_PALETTE.r),
+    px(8, 2, 1, 2, LIS_PALETTE.r),
+    px(3, 2, 4, 1, LIS_PALETTE.y),
+    px(2, 3, 1, 1, LIS_PALETTE.y),
+    px(7, 3, 1, 1, LIS_PALETTE.y),
+    px(4, 3, 2, 1, LIS_PALETTE.g),
+    `<path d="${starPath(x + 5, 7, 2.8)}" fill="${LIS_PALETTE.y}"/>`,
+    px(4.25, FLAG_BLUE_H, 1.5, BAR_H - FLAG_BLUE_H, LIS_PALETTE.r),
+    px(2, FLAG_BLUE_H + 1.5, 6, 1.5, LIS_PALETTE.r),
+  ].join('')
+}
+
 const rowSvg = (f: Flow, W: number, isWorking: boolean): string => {
   // The title takes what it needs, up to 40% of the row; the bar takes the rest.
   const title = fitText(f.title, 13, Math.max(60, W * 0.4))
@@ -127,17 +157,8 @@ const rowSvg = (f: Flow, W: number, isWorking: boolean): string => {
   const y0 = (H - BAR_H) / 2
   const fillW = Math.round(BAR_W * ratio(f))
   const runW = f.total ? Math.round((BAR_W * Math.min(f.total, f.done + f.running)) / f.total) : 0
-  const dots: string[] = []
-
-  // Dithered fill: sparse at the start, dense toward the head.
   const cols = Math.floor(fillW / CELL)
   const rows = Math.floor(BAR_H / CELL)
-  for (let c = 0; c < cols; c++) {
-    const density = 0.35 + 0.6 * Math.pow(c / Math.max(1, cols), 1.2)
-    for (let r = 0; r < rows; r++) {
-      if (noise(c, r) < density) dots.push(`<rect class="t${Math.floor(noise(r, c) * 4)}" x="${c * CELL + 1}" y="${r * CELL + 1}" width="2" height="2"/>`)
-    }
-  }
   // Handed to workers, not yet accepted: a faint second layer.
   const faint: string[] = []
   for (let c = cols; c < Math.floor(runW / CELL); c++) {
@@ -158,7 +179,7 @@ const rowSvg = (f: Flow, W: number, isWorking: boolean): string => {
   const percent = `${Math.round(ratio(f) * 100)}%`
   const titleAt = 'x="16"'
   const percentAt = `x="${W - CRAB_W - 6}" y="${H / 2 + 4.5}" text-anchor="end"`
-  const crabW = CRAB_BOX * 0.8
+  const emblem = fillW - pillW >= EMBLEM_W + 2 ? flagEmblem(pillX - EMBLEM_W - 2) : ''
 
   return `<svg xmlns="http://www.w3.org/2000/svg" width="${W}" height="${H}" viewBox="0 0 ${W} ${H}">
 <style>
@@ -176,7 +197,7 @@ const rowSvg = (f: Flow, W: number, isWorking: boolean): string => {
 <g transform="translate(${BAR_X},${y0})">
 <rect class="k" width="${BAR_W}" height="${BAR_H}" rx="${BAR_H / 2}"/>
 <g clip-path="url(#c)">
-<g fill="${color}">${dots.join('')}</g>
+<g class="flag"><rect width="${fillW}" height="${FLAG_BLUE_H}" fill="${LIS_PALETTE.b}"/><rect y="${FLAG_BLUE_H}" width="${fillW}" height="${BAR_H - FLAG_BLUE_H}" fill="${FLAG_WHITE}" stroke="${LIS_PALETTE.b}" stroke-width="2"/>${emblem}</g>
 <g fill="${color}" opacity="0.45">${faint.join('')}</g>
 <g class="tk">${ticks.join('')}</g>
 </g>
@@ -188,9 +209,10 @@ ${CRAB_CSS}${crab(W - CRAB_W + 1, 0, 'other', false, isWorking, 0.8)}
 </svg>`
 }
 
-const barText = (f: Flow, width: number): string => {
+// Half blocks, blue over white, with the star at the head of the fill.
+const flagBar = (f: Flow, width: number) => {
   const filled = Math.round(width * ratio(f))
-  return '█'.repeat(filled) + '░'.repeat(Math.max(0, width - filled))
+  return { fill: '▀'.repeat(Math.max(0, filled - 1)), star: filled > 0, rest: '░'.repeat(Math.max(0, width - filled)) }
 }
 
 // ---------------------------------------------------------------------------
@@ -720,6 +742,7 @@ export async function progressAbovePrompt($: EngineInterface, e: AbovePromptEven
   const cols = e.props.bodyColumns
   const titleW = Math.max(8, Math.min(30, f.title.length + 2, Math.floor(cols / 3)))
   const width = Math.max(6, Math.min(40, cols - titleW - 32))
+  const bar = flagBar(f, width)
   return (
     <Box flexDirection="column">
       <Box flexDirection="row" gap={2}>
@@ -727,7 +750,11 @@ export async function progressAbovePrompt($: EngineInterface, e: AbovePromptEven
           <Text color={f.isFinished ? DONE : ACCENT}>● </Text>
           <Text wrap="truncate-end">{f.title}</Text>
         </Box>
-        <Text color={f.isFinished ? DONE : ACCENT}>{barText(f, width)}</Text>
+        <Box flexShrink={0}>
+          {bar.fill ? <Text color={LIS_PALETTE.b} backgroundColor={FLAG_WHITE}>{bar.fill}</Text> : null}
+          {bar.star ? <Text color={LIS_PALETTE.y} backgroundColor={LIS_PALETTE.b}>★</Text> : null}
+          {bar.rest ? <Text dimColor>{bar.rest}</Text> : null}
+        </Box>
         <Text bold>{label(f)}</Text>
         <Text dimColor>{percent}</Text>
         <Text color={LIS_PALETTE.b}>▣</Text>

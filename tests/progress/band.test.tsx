@@ -83,6 +83,50 @@ test('desktop: the bar is one Svg with the count in its text', async ($, on) => 
   await ui.unmount()
 })
 
+// The Pernambuco flag: blue over white, the red cross, the rainbow arc and the yellow star.
+const BLUE = '#2348D0'
+const WHITE = '#FFFFFF'
+const FLAG = [BLUE, WHITE, '#D7262B', '#F5C400', '#1F9E46']
+
+async function halfDone($: Engine) {
+  await create($, 'Uma')
+  await create($, 'Duas')
+  await setStatus($, '1', 'completed')
+}
+
+test('terminal: the done part of the bar is the flag, blue over white, with the star at its head', async ($, on) => {
+  taskEngine(on)
+  await halfDone($)
+  const ui = await $.ui.mount({ plugin: PLUGIN, surface: 'terminal', component: 'AbovePrompt', props: band })
+  const fill = await ui.findAll({ type: 'Text', text: /^▀+$/ })
+  expect(fill).toHaveLength(1)
+  expect(fill[0]?.props.color).toBe(BLUE)
+  expect(fill[0]?.props.backgroundColor).toBe(WHITE)
+  const star = await ui.findAll({ type: 'Text', text: '★' })
+  expect(star).toHaveLength(1)
+  expect(star[0]?.props.color).toBe('#F5C400')
+  await ui.unmount()
+})
+
+test('terminal: with nothing done, the bar has no flag and no star', async ($, on) => {
+  taskEngine(on)
+  await create($, 'Uma')
+  const ui = await $.ui.mount({ plugin: PLUGIN, surface: 'terminal', component: 'AbovePrompt', props: band })
+  expect(await ui.findAll({ type: 'Text', text: /▀/ })).toHaveLength(0)
+  expect(await ui.findAll({ type: 'Text', text: /★/ })).toHaveLength(0)
+  await ui.unmount()
+})
+
+test('desktop: the done part of the bar is drawn in all the flag colours', async ($, on) => {
+  taskEngine(on)
+  await halfDone($)
+  const ui = await $.ui.mount({ plugin: PLUGIN, surface: 'desktop', component: 'AbovePrompt', props: band })
+  const source = String((await ui.find({ type: 'Svg' }))?.props.source)
+  const flag = /<g class="flag">([\s\S]*?)<\/g>/.exec(source)?.[1] ?? ''
+  for (const c of FLAG) expect(flag).toContain(c)
+  await ui.unmount()
+})
+
 test('two task calls at once both count', async ($, on) => {
   taskEngine(on)
   await Promise.all([create($, 'Uma'), create($, 'Duas')])
