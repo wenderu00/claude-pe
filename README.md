@@ -9,7 +9,10 @@ Um mod do Claude Code para devs que constroem serviços do Governo de Pernambuco
 - **Visual de Pernambuco.** A skin `pernambuco` usa as cores dos tokens da Liga Digital
   (`@uigovpe/styles`), no terminal claro e no escuro.
 - **Progresso.** Uma barra acima do prompt segue a lista de tarefas do Claude. O painel
-  `/agents-info` mostra os subagentes, com modelo, contexto, custo e tempo.
+  `/agents-info` mostra os subagentes, com modelo, contexto, custo e tempo. A mascote Lis, em
+  pixel art com a bandeira de Pernambuco no peito, anda na barra e no painel (no app desktop) e
+  fica no topo do painel no terminal. O mascote da tela inicial do Claude Code não muda: a API
+  de mods não deixa desenhar ali.
 - **Árvore de arquivos** na barra lateral, com git status e o que o Claude lê e escreve.
 - **Navegador no terminal** ([terminal-browser](https://github.com/zenbu-labs/terminal-browser)),
   para ver o Storybook e o app que você está construindo.
