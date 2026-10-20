@@ -87,9 +87,12 @@ const noise = (x: number, y: number): number => {
 // The whole row is one SVG: the desktop wraps sibling elements onto new lines,
 // so title, bar, percent and the crab live in one drawing; only the count and
 // the dismiss are Buttons beside it.
-const H = 22
+// The bar sits at the bottom of the row; Lis walks on top of it.
+const H = 44
 const BAR_H = 16
-const CRAB_W = 26
+const LIS_SCALE = 0.8
+// Lis's feet end on row 26 of her 30×28 grid.
+const LIS_FEET = 26
 // The crab's drawing grid is 30 units wide, props included.
 const CRAB_BOX = 30
 const CELL = 3
@@ -125,7 +128,9 @@ const fitText = (s: string, size: number, maxW: number): string => {
 // The Pernambuco flag in the bar's fill: blue over white, two thirds to one third.
 const FLAG_WHITE = '#FFFFFF'
 const FLAG_BLUE_H = Math.round((BAR_H * 2) / 3)
-const EMBLEM_W = 10
+// The emblem's pixel: the blue band is eight of them tall.
+const EMBLEM_U = FLAG_BLUE_H / 8
+const ARC_R = 5.5
 
 const starPath = (cx: number, cy: number, r: number): string =>
   Array.from({ length: 10 }, (_, i) => {
@@ -134,21 +139,26 @@ const starPath = (cx: number, cy: number, r: number): string =>
     return `${i ? 'L' : 'M'}${(cx + d * Math.cos(a)).toFixed(2)} ${(cy + d * Math.sin(a)).toFixed(2)}`
   }).join('') + 'Z'
 
-// The rainbow arc and the star on the blue, the cross on the white, `x` at the emblem's left edge.
-const flagEmblem = (x: number): string => {
-  const px = (dx: number, y: number, w: number, h: number, c: string): string =>
-    `<rect x="${x + dx}" y="${y}" width="${w}" height="${h}" fill="${c}"/>`
+// The flag's emblem centred on `cx`: the star above the rainbow arc standing on the
+// white, the sun inside the arc, the cross on the white.
+const flagEmblem = (cx: number): string => {
+  const U = EMBLEM_U
+  const px = (x: number, y: number, w: number, h: number, c: string): string =>
+    `<rect x="${+x.toFixed(3)}" y="${+y.toFixed(3)}" width="${+w.toFixed(3)}" height="${+h.toFixed(3)}" fill="${c}"/>`
+  const arc: string[] = []
+  for (let gy = 0; gy < 8; gy++) {
+    for (let gx = -7; gx < 7; gx++) {
+      const band = Math.floor(ARC_R - Math.hypot(gx + 0.5, 8 - (gy + 0.5)))
+      const c = [LIS_PALETTE.r, LIS_PALETTE.y, LIS_PALETTE.g][band]
+      if (c) arc.push(px(cx + gx * U, gy * U, U, U, c))
+    }
+  }
   return [
-    px(2, 1, 6, 1, LIS_PALETTE.r),
-    px(1, 2, 1, 2, LIS_PALETTE.r),
-    px(8, 2, 1, 2, LIS_PALETTE.r),
-    px(3, 2, 4, 1, LIS_PALETTE.y),
-    px(2, 3, 1, 1, LIS_PALETTE.y),
-    px(7, 3, 1, 1, LIS_PALETTE.y),
-    px(4, 3, 2, 1, LIS_PALETTE.g),
-    `<path d="${starPath(x + 5, 7, 2.8)}" fill="${LIS_PALETTE.y}"/>`,
-    px(4.25, FLAG_BLUE_H, 1.5, BAR_H - FLAG_BLUE_H, LIS_PALETTE.r),
-    px(2, FLAG_BLUE_H + 1.5, 6, 1.5, LIS_PALETTE.r),
+    ...arc,
+    px(cx - U, FLAG_BLUE_H - 2 * U, 2 * U, 2 * U, LIS_PALETTE.y),
+    `<path d="${starPath(cx, 2, 1.8)}" fill="${LIS_PALETTE.y}"/>`,
+    px(cx - 0.75, FLAG_BLUE_H, 1.5, BAR_H - FLAG_BLUE_H, LIS_PALETTE.r),
+    px(cx - 3, FLAG_BLUE_H + 1.5, 6, 1.5, LIS_PALETTE.r),
   ].join('')
 }
 
@@ -156,9 +166,10 @@ const rowSvg = (f: Flow, W: number, isWorking: boolean): string => {
   // The title takes what it needs, up to 40% of the row; the bar takes the rest.
   const title = fitText(f.title, 13, Math.max(60, W * 0.4))
   const BAR_X = Math.round(16 + textWidth(title, 13) + 12)
-  const BAR_W = Math.max(60, W - BAR_X - 46 - CRAB_W)
+  const BAR_W = Math.max(60, W - BAR_X - 46)
   const color = f.isFinished ? DONE : ACCENT
-  const y0 = (H - BAR_H) / 2
+  const y0 = H - BAR_H - 2
+  const mid = y0 + BAR_H / 2
   const fillW = Math.round(BAR_W * ratio(f))
   const runW = f.total ? Math.round((BAR_W * Math.min(f.total, f.done + f.running)) / f.total) : 0
   const cols = Math.floor(fillW / CELL)
@@ -182,8 +193,9 @@ const rowSvg = (f: Flow, W: number, isWorking: boolean): string => {
   const pillX = Math.max(0, Math.min(BAR_W - pillW, fillW - pillW))
   const percent = `${Math.round(ratio(f) * 100)}%`
   const titleAt = 'x="16"'
-  const percentAt = `x="${W - CRAB_W - 6}" y="${H / 2 + 4.5}" text-anchor="end"`
-  const emblem = fillW - pillW >= EMBLEM_W + 2 ? flagEmblem(pillX - EMBLEM_W - 2) : ''
+  const percentAt = `x="${W - 6}" y="${mid + 4.5}" text-anchor="end"`
+  const lisW = CRAB_BOX * LIS_SCALE
+  const lisX = BAR_X + Math.max(0, Math.min(BAR_W - lisW, fillW - lisW / 2))
 
   return `<svg xmlns="http://www.w3.org/2000/svg" width="${W}" height="${H}" viewBox="0 0 ${W} ${H}">
 <style>
@@ -195,13 +207,13 @@ const rowSvg = (f: Flow, W: number, isWorking: boolean): string => {
 @keyframes tw{0%,100%{opacity:1}50%{opacity:${f.isFinished ? 0.8 : 0.3}}}
 @media (prefers-reduced-motion: reduce){.t0,.t1,.t2,.t3{animation:none}}
 </style>
-<defs><clipPath id="c"><rect x="0" y="0" width="${BAR_W}" height="${BAR_H}" rx="${BAR_H / 2}"/></clipPath></defs>
-<circle cx="5" cy="${H / 2}" r="4" fill="${color}"/>
-<text class="t" ${titleAt} y="${H / 2 + 4.5}" font-family="${FONT}" font-size="13" font-weight="500">${xml(title)}</text>
+<defs><clipPath id="c"><rect x="0" y="0" width="${BAR_W}" height="${BAR_H}" rx="${BAR_H / 2}"/></clipPath><clipPath id="e"><rect width="${fillW}" height="${BAR_H}"/></clipPath></defs>
+<circle cx="5" cy="${mid}" r="4" fill="${color}"/>
+<text class="t" ${titleAt} y="${mid + 4.5}" font-family="${FONT}" font-size="13" font-weight="500">${xml(title)}</text>
 <g transform="translate(${BAR_X},${y0})">
 <rect class="k" width="${BAR_W}" height="${BAR_H}" rx="${BAR_H / 2}"/>
 <g clip-path="url(#c)">
-<g class="flag"><rect width="${fillW}" height="${FLAG_BLUE_H}" fill="${LIS_PALETTE.b}"/><rect y="${FLAG_BLUE_H}" width="${fillW}" height="${BAR_H - FLAG_BLUE_H}" fill="${FLAG_WHITE}" stroke="${LIS_PALETTE.b}" stroke-width="2"/>${emblem}</g>
+<g class="flag"><rect width="${fillW}" height="${FLAG_BLUE_H}" fill="${LIS_PALETTE.b}"/><rect y="${FLAG_BLUE_H}" width="${fillW}" height="${BAR_H - FLAG_BLUE_H}" fill="${FLAG_WHITE}" stroke="${LIS_PALETTE.b}" stroke-width="2"/><g class="emblem" clip-path="url(#e)">${flagEmblem(BAR_W / 2)}</g></g>
 <g fill="${color}" opacity="0.45">${faint.join('')}</g>
 <g class="tk">${ticks.join('')}</g>
 </g>
@@ -209,7 +221,7 @@ const rowSvg = (f: Flow, W: number, isWorking: boolean): string => {
 <text x="${pillX + pillW / 2}" y="${BAR_H / 2 + 4}" text-anchor="middle" font-family="${FONT}" font-size="11" font-weight="600" fill="#ffffff">${xml(text)}</text>
 </g>
 <text class="m" ${percentAt} font-family="${FONT}" font-size="12.5" font-variant-numeric="tabular-nums">${percent}</text>
-${CRAB_CSS}${crab(W - CRAB_W + 1, 0, 'other', false, isWorking, 0.8)}
+${CRAB_CSS}${crab(+lisX.toFixed(2), +(y0 - LIS_FEET * LIS_SCALE).toFixed(2), 'other', false, isWorking, LIS_SCALE)}
 </svg>`
 }
 
