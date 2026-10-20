@@ -211,6 +211,86 @@ test('desktop: the done part of the bar is drawn in all the flag colours', async
   await ui.unmount()
 })
 
+const desktopBar = async ($: Engine) => {
+  const ui = await $.ui.mount({ plugin: PLUGIN, surface: 'desktop', component: 'AbovePrompt', props: band })
+  const svg = await ui.find({ type: 'Svg' })
+  await ui.unmount()
+  return { source: String(svg?.props.source), height: svg?.props.height }
+}
+
+type Rect = { x: number; y: number; w: number; h: number; fill: string }
+const rectsOf = (svg: string): Rect[] =>
+  [...svg.matchAll(/<rect x="([\d.-]+)" y="([\d.-]+)" width="([\d.]+)" height="([\d.]+)" fill="(#[0-9A-F]{6})"\/>/gi)].map(m => ({
+    x: Number(m[1]), y: Number(m[2]), w: Number(m[3]), h: Number(m[4]), fill: m[5]!.toUpperCase(),
+  }))
+const emblemOf = (source: string) => /<g class="emblem"[^>]*>([\s\S]*?)<\/g>/.exec(source)?.[1] ?? ''
+// The star's points, from its path.
+const starOf = (emblem: string) => {
+  const d = /<path d="([^"]+)" fill="#F5C400"\/>/.exec(emblem)?.[1] ?? ''
+  const nums = [...d.matchAll(/-?\d+(?:\.\d+)?/g)].map(m => Number(m[0]))
+  return nums.flatMap((n, i) => (i % 2 ? [] : [{ x: n, y: nums[i + 1]! }]))
+}
+// The flag's blue band is 11 of the bar's 16 pixels.
+const HORIZON = 11
+
+test('desktop: the emblem is the flag’s: the star above the arc, the sun inside it, the cross on the white', async ($, on) => {
+  taskEngine(on)
+  await halfDone($)
+  await setStatus($, '2', 'completed')
+  const emblem = emblemOf((await desktopBar($)).source)
+  const rects = rectsOf(emblem)
+  const arc = rects.filter(r => r.y + r.h <= HORIZON && (r.fill === RED || r.fill === '#1F9E46'))
+  expect(arc.length).toBeGreaterThan(0)
+  const arcTop = Math.min(...arc.map(r => r.y))
+  const star = starOf(emblem)
+  expect(star.length).toBe(10)
+  expect(Math.max(...star.map(p => p.y))).toBeLessThanOrEqual(arcTop)
+
+  const middle = star.reduce((s, p) => s + p.x, 0) / star.length
+  const sun = rects.filter(r => r.fill === YELLOW && r.y + r.h === HORIZON && r.x < middle && r.x + r.w > middle)
+  expect(sun.length).toBe(1)
+  expect(rects.some(r => r.fill === RED && r.y >= HORIZON)).toBe(true)
+})
+
+test('desktop: the emblem sits in the middle of the bar and shows once the bar is filled past it', async ($, on) => {
+  taskEngine(on)
+  for (const s of ['Uma', 'Duas', 'Três', 'Quatro']) await create($, s)
+  await setStatus($, '1', 'completed')
+  const shown = (source: string) => {
+    const clip = Number(/<clipPath id="e"><rect width="([\d.]+)"/.exec(source)?.[1] ?? NaN)
+    const star = starOf(emblemOf(source))
+    return clip >= Math.max(...star.map(p => p.x))
+  }
+  expect(shown((await desktopBar($)).source)).toBe(false)
+  for (const id of ['2', '3', '4']) await setStatus($, id, 'completed')
+  expect(shown((await desktopBar($)).source)).toBe(true)
+})
+
+test('desktop: Lis walks on top of the bar, at the edge of what is done', async ($, on) => {
+  taskEngine(on)
+  await create($, 'Uma')
+  await create($, 'Duas')
+  const at = async () => {
+    const { source, height } = await desktopBar($)
+    const [, bx, by] = /<g transform="translate\(([\d.]+),([\d.]+)\)">/.exec(source) ?? []
+    const [, lx, ly, s] = /<g transform="translate\(([\d.]+),([\d.]+)\) scale\(([\d.]+)\)"/.exec(source) ?? []
+    return { height, barX: Number(bx), barTop: Number(by), x: Number(lx), feet: Number(ly) + 26 * Number(s) }
+  }
+  const none = await at()
+  await setStatus($, '1', 'completed')
+  const half = await at()
+  await setStatus($, '2', 'completed')
+  const full = await at()
+
+  expect(none.height).toBe(44)
+  expect(half.x).toBeGreaterThan(none.x)
+  expect(full.x).toBeGreaterThan(half.x)
+  for (const p of [none, half, full]) {
+    expect(p.x).toBeGreaterThanOrEqual(p.barX)
+    expect(p.feet).toBeLessThanOrEqual(p.barTop + 0.01)
+  }
+})
+
 test('two task calls at once both count', async ($, on) => {
   taskEngine(on)
   await Promise.all([create($, 'Uma'), create($, 'Duas')])
